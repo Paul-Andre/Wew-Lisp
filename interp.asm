@@ -3,7 +3,11 @@
 SECTION .data
 
     heap_start: dq 0
+    program_end: dq 0
+
     alloc_ptr: dq 0
+
+
 
     buffLen equ 80
 	buff: times (buffLen+1) db 0
@@ -56,6 +60,32 @@ _start:
         cmp rax, 0
         jne reading_loop
 
+    ; After the loop:
+
+        ; Save the end of the program
+        mov rax, [alloc_ptr]
+        mov [program_end], rax
+
+        ; Add a null terminator
+        mov byte [rax], 0
+        inc rax
+        call printNumber
+
+    ; Align the pointer to 16 bytes
+    align_loop:
+        mov rdi, rax
+        and rdi, 0x0f
+        cmp rdi, 0
+        je align_loop_break
+
+        inc rax
+        call printNumber
+        jmp align_loop
+        
+    align_loop_break:
+        mov [alloc_ptr], rax
+
+
 
 
 
@@ -77,7 +107,6 @@ _start:
         mov rax, 60
         mov rdi, 0
         syscall
-
 
 
 
