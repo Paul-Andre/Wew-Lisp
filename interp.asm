@@ -1,16 +1,40 @@
 ; Wew lads
 
+; Define the type tags
+
+; Null array, also works as false
+%define null_t 0
+
+; 64-bit int. Also works as a pointer
+%define int_t 1
+
+; Points to a heap allocated cons cell
+%define cons_t 2
+
+; A symbol is a null-terminated string
+%define symbol_t 3
+
+; Built-in function
+%define bi_fun_t 4
+
+; A function defined in scheme
+%define sc_fun_t 5
+
+
+
 SECTION .data
-
-    heap_start: dq 0
-    program_end: dq 0
-
-    alloc_ptr: dq 0
+    
 
 
+SECTION .bss
+    heap_start: resq
+    program_end: resq
+
+    alloc_ptr: resq
 
     buffLen equ 80
-	buff: times (buffLen+1) db 0
+	buff: times (buffLen+1) resb 0
+    
 
 
 SECTION .text
@@ -71,10 +95,10 @@ _start:
         inc rax
         call printNumber
 
-    ; Align the pointer to 16 bytes
+    ; Align the pointer to 32 bytes (size of a pair)
     align_loop:
         mov rdi, rax
-        and rdi, 0x0f
+        and rdi, 0x1f
         cmp rdi, 0
         je align_loop_break
 
@@ -110,6 +134,246 @@ _start:
 
 
 
+
+
+parse:
+    ; string pointer comes into rsi
+
+    ; type of output comes out of rax
+    ; value of output comes out of rbx
+    ; string pointer to rest of the string stays in rsi
+
+        call skipSpaces
+
+        mov al, [rsi]
+
+    .checkIfList:
+
+        cmp al, '('
+        jne .checkIfNum
+
+        inc rsi
+
+        call parseRestOfList
+
+        ret
+
+    .checkIfNum:
+        
+        cmp al, '0'
+        jb .mustBeSymbol
+
+        cmp al, '9'
+        ja .mustBeSymbol
+
+        call parseNum
+
+        mov rbx, rax
+        mov rax, int_t
+
+        ret
+
+    .mustBeSymbol:
+        
+        mov rax, symbol_t
+        mov rbx, rsi
+
+        call findEndOfSymbol
+
+        ret
+
+
+findEndOfSymbol:
+    ; string pointer comes into rsi
+
+    ; string pointer of string after symbol comes out of rsi
+
+		
+	.start:
+		mov r8b, [rsi]
+	
+		cmp r8b, ' '
+		je .end
+        cmp r8b, ')'
+		je .end
+        cmp r8b, '('
+		je .end
+		cmp r8b, `\t`
+		je .end
+		cmp r8b, `\n` ; something something line break carriage return XXX
+		je .end
+
+		inc rsi
+		jmp .start
+		
+	.end:
+
+    ret
+
+
+
+        
+    
+
+        
+
+
+parseNum:
+    ; string pointer comes into rsi
+
+    ; number comes out of rax
+    ; pointer to rest of string will stay in rsi
+		
+		push rbx
+		push rcx
+		push rdx
+		push rdi
+		
+
+        mov rcx, 0
+		
+	.getDigits:
+
+		mov rax, 0
+		mov al, [rsi]
+
+        cmp al, '0'
+        jb .startMakingNumber
+
+        cmp al, '9'
+        ja .startMakingNumber
+
+        sub rax, '0'
+
+		push rax
+		inc rcx
+		inc rsi
+		jmp .getDigits
+	
+	.startMakingNumber:
+		
+		mov rbx, 1
+		mov rdi, 0
+
+	.makingNumbersLoop:	
+		cmp rcx,0
+		je .end
+		pop rax
+		mul rbx
+		add rdi, rax
+		mov rax, 10
+		mul rbx
+		mov rbx, rax
+		
+		dec rcx
+		jmp .makingNumbersLoop
+
+	.end:
+	
+		mov rax, rdi 
+		
+		pop rdi
+		pop rdx
+		pop rcx
+		pop rbx
+
+ret
+;;;;;;;;;;;;;;
+
+
+
+
+
+
+parseRestOfList:
+    ; string pointer comes into rsi
+
+    ; type of outcome comes out of rax (is a list or null)
+    ; value of outcome comes out of rbx
+
+    ; TODO: make this tail-call recursive by passing the place to write the value to as a parameter
+
+        call skipSpaces
+
+        mov al, [rsi]
+
+        cmp al, ')'
+        je .returnNull
+
+        cmp al, 0
+        je .noClosingParen
+
+        call parse
+
+        push rax
+        push rbx
+
+        call parseRestOfList
+
+        pop rdx
+        pop rcx
+        ; now the car is in rcx:rdx
+        ; cdr is in rax:rbx
+
+        ; write the values to heap
+        mov rdi, [alloc_ptr]
+
+        mov [rdi], rcx
+        mov [rdi+8], rdx
+        mov [rdi+16], rax
+        mov [rdi+24], rbx
+
+        mov rax, cons_t
+        mov rbx, rdi
+
+        add [alloc_ptr], 32
+
+        ret
+
+
+    .returnNull:
+        mov rax, null_t
+        mov rbx, 0
+        ret
+
+
+    .noClosingParen
+    ; TODO: print error message
+        mov rdi, 1
+        jmp exit
+
+
+
+    
+skipSpaces:
+    ; buffer pointer comes into esi
+		
+		push rax
+		
+	.start:
+		mov al, [rsi]
+	
+		cmp al, ' '
+		je .continue
+		cmp al, `\t`
+		je .continue
+		cmp al, `\n` ; something something line break carriage return XXX
+		je .continue
+
+        jmp .end
+		
+    .continue:
+		inc rsi
+		
+		jmp .start
+		
+	.end:
+		pop rax
+
+    ret
+
+
+    
 
 
 
@@ -192,4 +456,11 @@ printNumber:
 		pop rax
 	
 ret
+
+
+exit:
+    ; rdi specifies return code
+        mov rax, 60
+        syscall
+    
     
