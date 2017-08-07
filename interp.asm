@@ -27,13 +27,13 @@ SECTION .data
 
 
 SECTION .bss
-    heap_start: resq
-    program_end: resq
+    heap_start: resq 1
+    program_end: resq 1
 
-    alloc_ptr: resq
+    alloc_ptr: resq 1
 
     buffLen equ 80
-	buff: times (buffLen+1) resb 0
+	buff: resb (buffLen+1)
     
 
 
@@ -326,7 +326,7 @@ parseRestOfList:
         mov rax, cons_t
         mov rbx, rdi
 
-        add [alloc_ptr], 32
+        add qword [alloc_ptr], 32
 
         ret
 
@@ -337,7 +337,7 @@ parseRestOfList:
         ret
 
 
-    .noClosingParen
+    .noClosingParen:
     ; TODO: print error message
         mov rdi, 1
         jmp exit
