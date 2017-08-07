@@ -23,7 +23,8 @@
 
 
 SECTION .data
-    
+    genericErrorMsg: db `There was some error.\n`
+	genericErrorMsgLen equ $-genericErrorMsg
 
 
 SECTION .bss
@@ -93,9 +94,8 @@ _start:
         ; Add a null terminator
         mov byte [rax], 0
         inc rax
-        call printNumber
 
-    ; Align the pointer to 32 bytes (size of a pair)
+    ; Align the pointer to 32 bytes (size of a cons)
     align_loop:
         mov rdi, rax
         and rdi, 0x1f
@@ -103,7 +103,6 @@ _start:
         je align_loop_break
 
         inc rax
-        call printNumber
         jmp align_loop
         
     align_loop_break:
@@ -113,15 +112,24 @@ _start:
 
 
 
+
+
+
+mov rsi, [heap_start]
+call parse
+
+;call printNumber
+
+call print
+
 ; Print what came in stdin to stdout
 
-        mov rax, 1
-        mov rdi, 1 ; stdout
-        mov rsi, [heap_start]
-        mov rdx, [alloc_ptr]
-        sub rdx, [heap_start]
-        syscall
-
+        ;mov rax, 1
+        ;mov rdi, 1 ; stdout
+        ;mov rsi, [heap_start]
+        ;mov rdx, [program_end]
+        ;sub rdx, [heap_start]
+        ;syscall
 
 
 
@@ -134,6 +142,218 @@ _start:
 
 
 
+print:
+    ; type of input comes into rax
+    ; input comes into rbx
+
+        push rdi
+
+
+    .maybeList:
+        cmp rax, null_t
+        je .isList
+
+        cmp rax, cons_t
+        je .isList
+
+        jmp .maybeNumber
+
+    .isList:
+        push rax
+
+        mov rdi, 1 ; print to stdout
+
+        mov al, '('
+        call printChar
+
+
+
+
+        mov al, ' '
+        call printChar
+
+        pop rax
+
+        call printRestOfList
+        jmp .return
+
+
+    .maybeNumber:
+        cmp rax, int_t
+        jne .maybeSymbol
+
+        mov rax, rbx
+
+        call printNumber
+
+        jmp .return
+        
+
+    .maybeSymbol:
+        cmp rax, symbol_t
+        jne .error
+
+        push rsi
+
+        mov rsi, rbx
+        call printNullTerminatedString
+
+        pop rsi
+
+        jmp .return
+
+    .error:
+        call exitError
+
+
+    .return:
+        pop rdi
+        ret
+
+
+
+printNullTerminatedString:
+    ; string comes into rsi
+        
+        push rax
+        push rdi
+        push rdx
+
+        push rsi
+
+        mov rdx, 0
+
+    .findLength:
+        mov r9b, [rsi]
+        cmp r9b, 0
+        je .print
+
+        inc rsi
+        inc rdx
+        jmp .findLength
+
+    .print:
+
+        mov rax, 1 ; write
+        mov rdi, 1 ; stdout
+        pop rsi ; get beginning of string
+        ; rdx is the size of the string
+        syscall
+
+        pop rdx
+        pop rdi
+        pop rax
+        ret
+
+
+
+
+printRestOfList:
+    ; type (null or cons) comes into rax
+    ; value comes into rax
+
+    push rdi
+
+
+    .start:
+
+    .maybeNull:
+        cmp rax, null_t
+        jne .notNull
+
+        mov rdi, 1 ; print to stdout
+
+        mov al, ')'
+        call printChar
+
+        jmp .return
+
+    .notNull:
+        cmp rax, cons_t
+        jne .somethingElse
+
+        push rax
+        push rbx
+
+        ; Get the car of the cons
+        mov rax, [rbx]
+        mov rbx, [rbx + 8]
+
+        ; Print it
+        call print
+
+        mov rdi, 1 ; print char to stdout
+        mov al, ' '
+        call printChar
+
+        pop rbx
+        pop rax
+
+        ; Get the cdr of the cons
+        mov rax, [rbx + 16]
+        mov rbx, [rbx + 24]
+
+        ; recursive tail-call
+        jmp .start
+
+
+
+    .somethingElse: ; to consider the weird case of pairs whose cdr isn't a list (cons 1 1) = '(1 . 1)
+        
+        push rax
+
+
+        mov rdi, 1 ; print to stdout
+
+        mov al, '.'
+        call printChar
+        mov al, ' '
+        call printChar
+
+
+        pop rax
+
+        call print
+
+    
+        mov rdi, 1 ; print to stdout
+        mov al, ' '
+        call printChar
+        mov al, ')'
+        call printChar
+
+        jmp .return
+
+    .return:
+        pop rdi
+
+        ret
+
+
+
+printChar:
+    ; character to print comes into al
+    ; file to print to comes into rdi
+
+    push rdi
+    push rsi
+    push rdx
+
+    mov byte [rsp+8], al
+
+    mov rax, 1
+    ; rdi is already right
+    lea rsi, [rsp+8]
+    mov rdx, 1
+    syscall
+
+    pop rdx
+    pop rsi
+    pop rdi
+
+    ret
+
+
 
 
 parse:
@@ -142,6 +362,8 @@ parse:
     ; type of output comes out of rax
     ; value of output comes out of rbx
     ; string pointer to rest of the string stays in rsi
+
+    ; I do this hack where I replace whitespace and parentheses with '\0' so that symbols can be just pointers into source code
 
         call skipSpaces
 
@@ -152,7 +374,9 @@ parse:
         cmp al, '('
         jne .checkIfNum
 
+        mov byte [rsi], 0
         inc rsi
+
 
         call parseRestOfList
 
@@ -174,6 +398,9 @@ parse:
         ret
 
     .mustBeSymbol:
+
+        cmp al, ')'
+        je .error
         
         mov rax, symbol_t
         mov rbx, rsi
@@ -181,6 +408,13 @@ parse:
         call findEndOfSymbol
 
         ret
+
+    .error:
+        call exitError
+
+
+
+    
 
 
 findEndOfSymbol:
@@ -292,6 +526,11 @@ parseRestOfList:
     ; value of outcome comes out of rbx
 
     ; TODO: make this tail-call recursive by passing the place to write the value to as a parameter
+    
+        push rcx
+        push rdx
+        push rdi
+
 
         call skipSpaces
 
@@ -304,14 +543,18 @@ parseRestOfList:
         je .noClosingParen
 
         call parse
+        
 
         push rax
         push rbx
 
+        
         call parseRestOfList
+
 
         pop rdx
         pop rcx
+
         ; now the car is in rcx:rdx
         ; cdr is in rax:rbx
 
@@ -323,26 +566,34 @@ parseRestOfList:
         mov [rdi+16], rax
         mov [rdi+24], rbx
 
+
         mov rax, cons_t
         mov rbx, rdi
 
         add qword [alloc_ptr], 32
 
-        ret
-
+        jmp .return
 
     .returnNull:
+        mov byte [rsi], 0
+        inc rsi
+
         mov rax, null_t
         mov rbx, 0
-        ret
+        jmp .return
 
 
     .noClosingParen:
     ; TODO: print error message
-        mov rdi, 1
-        jmp exit
+        jmp exitError
 
 
+    .return:
+        pop rdi
+        pop rdx
+        pop rcx
+        
+        ret
 
     
 skipSpaces:
@@ -363,6 +614,7 @@ skipSpaces:
         jmp .end
 		
     .continue:
+        mov byte [rsi], 0
 		inc rsi
 		
 		jmp .start
@@ -387,6 +639,7 @@ printNumber:
 		push rcx
 		push rdx
         push rdi
+        push rsi
 
 
         push rax
@@ -436,8 +689,8 @@ printNumber:
 	
 	
 	.end:
-        mov al, `\n`
-        stosb
+        ;mov al, `\n`
+        ;stosb
 
         mov rdx, rdi
         sub rdx, buff
@@ -449,6 +702,7 @@ printNumber:
 
 
 
+        pop rsi
         pop rdi
 		pop rdx
 		pop rcx
@@ -458,9 +712,19 @@ printNumber:
 ret
 
 
-exit:
+exitError:
+
+    ; First print a generic error message:
+        mov rax, 1
+        mov rdi, 2 ; stderr
+        mov rsi, genericErrorMsg
+        mov rdx, genericErrorMsgLen
+        syscall
+
+
     ; rdi specifies return code
         mov rax, 60
+        mov rdi, 1
         syscall
     
     
