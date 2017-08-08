@@ -417,7 +417,7 @@ eval:
 
         call cmpNullTerminatedStrings
         cmp rax, 0
-        jne .notSpecialForm
+        jne .maybeLambda
 
 
         mov r11, [r10 + 24] ; get the cdr
@@ -432,6 +432,35 @@ eval:
 
         jmp .endCons
 
+
+    .maybeLambda:
+        mov rsi, r9
+        mov rdi, lambdaSymbol
+
+        call cmpNullTerminatedStrings
+        cmp rax, 0
+        jne .notSpecialForm
+
+        mov r11, [r10 + 24] ; get the cdr
+        mov r10, [r10 + 16]
+
+        cmp r10, cons_t ; if cdr not a cons, is not correct
+        jne exitError
+
+        ; A lambda is a pair of its environment and its ast (excluding the "lambda" bit)
+
+        mov rsi, [alloc_ptr]
+
+        mov [rsi], rdx
+        mov [rsi+8], rcx
+        mov [rsi+16], r10
+        mov [rsi+24], r11
+        
+        add qword [alloc_ptr], 32
+
+        mov rdi, sc_fun_t
+
+        jmp .endCons
 
 
     .notSpecialForm:
