@@ -153,6 +153,13 @@ _start:
 
     call addToEnvironment
 
+    mov rdx, symbol_t
+    mov rcx, plusSymbol
+    mov r8, bi_fun_t
+    mov r9, builtInAdd
+
+    call addToEnvironment
+
 
 
     pop rbx
@@ -187,15 +194,6 @@ cmpNullTerminatedStrings:
     ; returns 0 in rax if strings are equal, something else if they are not
     ; (idea is that eventually we might also say whether one of them is bigger than the other)
 
-    push rsi
-    call printNullTerminatedString
-    call printNewline
-
-    mov rsi, rdi
-
-    call printNullTerminatedString
-    call printNewline
-    pop rsi
 
     .loop:
         mov r8b, [rdi]
@@ -435,14 +433,19 @@ eval:
 
         push rdx
         push rcx
+        push r10
 
         call eval
 
+        pop r10
         pop rcx
         pop rdx
         
         cmp rdi, bi_fun_t ; built-in function
         jne exitError
+
+
+
 
         mov r8, [r10 + 16] ; get the cdr
         mov r9, [r10 + 24]
@@ -580,6 +583,42 @@ handleIf:
         ret
 
 
+
+builtInAdd:
+    
+
+        mov rax, 0
+
+        lea rdi, [rdi*2]
+        lea rdi, [rdi*8]
+
+    .loop:
+        cmp rdi, 0
+        je .return
+
+        mov rsi, [rsp + rdi]
+
+        cmp rsi, int_t
+        jne exitError
+
+        sub rdi, 8
+        add rax, [rsp + rdi]
+
+        sub rdi, 8
+
+        jmp .loop
+
+    .return:
+
+        mov rdi, int_t
+        mov rsi, rax
+
+        ret
+
+    
+
+
+
 handleBuiltIn:
     ; rdi:rsi is the function. rdi doesn't really matter tho since we know it's bi_fun_t
     ; rdx:rcx is the environment of course
@@ -621,6 +660,7 @@ handleBuiltIn:
 
         call eval
 
+
         mov r10, rdi
         mov r11, rsi
 
@@ -641,6 +681,7 @@ handleBuiltIn:
 
         ; Now it's the time to evaluate that function
         mov r12, rax ; We need to save the number of arguments somewhere not on the stack
+        mov rdi, rax
 
         call rsi
         
