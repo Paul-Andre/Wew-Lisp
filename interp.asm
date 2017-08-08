@@ -351,41 +351,94 @@ eval:
         ret ; Integers are "self-quoting"
 
     .cons:
-        push r12
-        push r13
-        push r14
-        push r15
 
-        mov r12, [rsi] ; (car exp) type
-        mov r13, [rsi+8] ; (car exp)
-        mov r14, [rsi+16] ; (cdr exp) type
-        mov r15, [rsi+24] ; (cdr exp)
+        mov r8, [rsi] ; (car exp) type
+        mov r9, [rsi+8] ; (car exp)
+        mov r10, [rsi+16] ; (cdr exp) type
+        mov r11, [rsi+24] ; (cdr exp)
 
-        cmp r12, symbol_t
+        cmp r8, symbol_t
         jne .notBasicForm
 
     ; Check if "if"
     .maybeIf:
         mov rdi, ifSymbol
-        mov rsi, r13
+        mov rsi, r9
 
         push rdx
         push rcx
+        push r10
+        push r11
 
         call cmpNullTerminatedStrings
 
+        pop r11
+        pop r10
         pop rcx
         pop rdx
 
         cmp rax, 0
         jne .notBasicForm
 
+        mov rdi, r10
+        mov rsi, r11
+
+        jmp handleIf; tail call
+
+
+
+
+    .notBasicForm:
+
+        jmp exitError
+
+
+
+        jmp .endCons
+    .endCons:
+        
+        jmp .return
+
+        jmp exitError ; NOT IMPLEMENTED
+
+    .symbol:
+        push rdx
+        push rcx
+
+        mov rdi, rdx
+        mov rdx, rsi
+        mov rsi, rcx
+
+
+        call findInEnvironment
+
+
+        pop rcx
+        pop rdx
+        jmp .return
+
+
+    .return: 
+
+        ret
+
+
+handleIf:
+    ; rdi:rsi is (cdr exp)
+    ; rdx:rcx is environment
+    ;
+    ; returns in rdi:rsi
+    ; returns environment in rdx:rcx
+
+        push r12
+        push r13
+        push r14
+        push r15
 
         ; If cdr isn't a list, it's worthless
-        cmp r14, cons_t
+        cmp rdi, cons_t
         jne exitError
 
-        mov rsi, r15
         mov r12, [rsi] ; (car (cdr exp)) type (the condition)
         mov r13, [rsi+8] ; (car (cdr exp)) 
         mov r14, [rsi+16] ; (cdr (cdr exp)) type
@@ -429,7 +482,7 @@ eval:
         pop rdx
 
 
-        jmp .endCons
+        jmp .return
     .isFalse:
 
         ; we need to get and evaluate the cadddr
@@ -460,49 +513,16 @@ eval:
         pop rcx
         pop rdx
 
-        jmp .endCons
+        jmp .return
 
+    .return:
 
-
-    .notBasicForm:
-
-        jmp exitError
-
-
-
-        jmp .endCons
-    .endCons:
-        
         pop r15
         pop r14
         pop r13
         pop r12
 
-        jmp .return
-
-        jmp exitError ; NOT IMPLEMENTED
-
-    .symbol:
-        push rdx
-        push rcx
-
-        mov rdi, rdx
-        mov rdx, rsi
-        mov rsi, rcx
-
-
-        call findInEnvironment
-
-
-        pop rcx
-        pop rdx
-        jmp .return
-
-
-    .return: 
-
         ret
-
 
 
 
