@@ -1,19 +1,7 @@
 
 SECTION .data
 
-    testSymbol: db "abc",0
-    testSymbol2: db "wew",0
-    testSymbol3: db "lads",0
     nullSymbol: db "null",0
-
-    ; Built-in functions:
-
-    plusSymbol: db "+",0
-    consSymbol: db "cons",0
-    listSymbol: db "list",0
-    printSymbol: db "print",0
-    applySymbol: db "apply",0
-    minusSymbol: db "-",0
 
 
 SECTION .text
@@ -123,6 +111,22 @@ builtInList:
         ret
 
 
+%macro insertFunctionIntoEnvironment 2
+    ; embed the string in the source... what???
+    jmp %%after
+    %%string: db %2, 0
+    %%after:
+
+    mov rdx, symbol_t
+    mov rcx, %%string
+    mov r8, bi_fun_t
+    mov r9, %1
+
+    call addToEnvironment
+
+%endmacro
+
+
 
 createInitialEnvironment:
 
@@ -132,46 +136,15 @@ createInitialEnvironment:
     mov rsi, 0
 
     mov rdx, symbol_t
-    mov rcx, testSymbol
-    mov r8, int_t
-    mov r9, 42
-
-    call addToEnvironment
-
-    mov rdx, symbol_t
-    mov rcx, testSymbol2
-    mov r8, symbol_t
-    mov r9, testSymbol3
-
-    call addToEnvironment
-
-    mov rdx, symbol_t
     mov rcx, nullSymbol
     mov r8, null_t
     mov r9, 0
 
     call addToEnvironment
 
-    mov rdx, symbol_t
-    mov rcx, plusSymbol
-    mov r8, bi_fun_t
-    mov r9, builtInAdd
-
-    call addToEnvironment
-
-    mov rdx, symbol_t
-    mov rcx, consSymbol
-    mov r8, bi_fun_t
-    mov r9, builtInCons
-
-    call addToEnvironment
-
-    mov rdx, symbol_t
-    mov rcx, listSymbol
-    mov r8, bi_fun_t
-    mov r9, builtInList
-
-    call addToEnvironment
+    insertFunctionIntoEnvironment builtInAdd, "+"
+    insertFunctionIntoEnvironment builtInCons, "cons"
+    insertFunctionIntoEnvironment builtInList, "list"
 
     ret
 
