@@ -32,6 +32,7 @@ SECTION .data
 
     plusSymbol: db "+",0
     consSymbol: db "cons",0
+    listSymbol: db "list",0
     minusSymbol: db "-",0
     multiplicationSymbol: db "*",0
     divisionSymbol: db "/",0
@@ -165,6 +166,13 @@ _start:
     mov rcx, consSymbol
     mov r8, bi_fun_t
     mov r9, builtInCons
+
+    call addToEnvironment
+
+    mov rdx, symbol_t
+    mov rcx, listSymbol
+    mov r8, bi_fun_t
+    mov r9, builtInList
 
     call addToEnvironment
 
@@ -728,14 +736,14 @@ builtInAdd:
         cmp rdi, 0
         je .return
 
-        mov rsi, [rsp + rdi]
+        mov rsi, [rsp + rdi - 8]
 
         cmp rsi, int_t
         jne exitError
 
-        sub rdi, 8
         add rax, [rsp + rdi]
 
+        sub rdi, 8
         sub rdi, 8
 
         jmp .loop
@@ -753,10 +761,10 @@ builtInCons:
         cmp rdi, 2
         jne exitError
 
-        mov r8, [rsp + 32]
-        mov r9, [rsp + 24]
-        mov r10, [rsp + 16]
-        mov r11, [rsp + 8]
+        mov r8, [rsp + 24]
+        mov r9, [rsp + 32]
+        mov r10, [rsp + 8]
+        mov r11, [rsp + 16]
 
         mov rdi, [alloc_ptr]
 
@@ -775,6 +783,101 @@ builtInCons:
         ret
 
 
+
+builtInList:
+
+
+        mov r10, rdi
+
+        mov rdi, null_t
+        mov rsi, 0
+
+        lea r10, [r10*2]
+        lea r10, [r10*8]
+        mov r11, 0
+
+    .loop:
+
+        
+        cmp r10, r11
+        je .return
+
+
+        add r11, 8
+        mov r8, [rsp + r11]
+        add r11, 8
+        mov r9, [rsp + r11]
+
+        mov rax, [alloc_ptr]
+
+        mov [rax], r8
+        mov [rax + 8], r9
+        mov [rax + 16], rdi
+        mov [rax + 24], rsi
+
+        mov rdi, cons_t
+        mov rsi, [alloc_ptr]
+        
+        add qword [alloc_ptr], 32
+
+        jmp .loop
+
+    .return:
+
+        ; At this point, rdi:rsi contains the answer
+        
+        ret
+
+
+
+%macro pushEverything 0
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+%endmacro
+    
+%macro popEverything 0
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+
+%endmacro
+
+
+printWrapper:
+    pushEverything
+
+    mov rax, rdi
+    mov rbx, rsi
+
+    call print
+
+    popEverything
+
+    ret
 
 
 handleBuiltInApplication:
@@ -829,8 +932,8 @@ handleBuiltInApplication:
         pop rax
 
 
-        push r10
         push r11
+        push r10
 
         mov r8, r14
         mov r9, r15
@@ -866,6 +969,8 @@ handleSchemeApplication:
     ; rdi:rsi is the function. we know it's a bi_fun_t
     ; rdx:rcx is the environment of course
     ; r8:r9 is the argument list
+    ; 
+    ;
     ;
     ; rdi:rsi value out
     ; Let's assume that there is no environment out
@@ -875,19 +980,21 @@ handleSchemeApplication:
     push r13
     push r14
     push r15
+
     push rbx
 
-    mov rbx, rsi
+    mov rbx, rsi ; save the function
 
-    ;  Get the function AST
-    mov r14, [rsi+16]
-    mov r15, [rsi+24]
+    ; We eval the arguments and place them on the stack;
+    ; We then pop them back and construct a list;
+    ; We then pass that list to addToEnvironment which will treat
+    ; correctly both cases of (lambda x ...) and (lambda (a b c) ...)
+    ;
+    ; I should perhaps treat both cases separately to avoid creating useless list
 
-
-    ; 
-
-    ;  Get the first
-
+    ; This will be used to iterate through the arguments
+    mov r12, r8
+    mov r13, r9
     
     .argEvalLoop:
         cmp r8, null_t
@@ -896,32 +1003,29 @@ handleSchemeApplication:
         cmp r8, cons_t
         jne exitError
 
-        mov r12, [r9]
-        mov r13, [r9+8]
+        mov rdi, [r9]
+        mov rsi, [r9+8]
         mov r8, [r9+16]
         mov r9, [r9+24]
 
-        push rsi
-        push rdi
         push rdx
         push rcx
-
-        mov rdi, r12
-        mov rsi, r13
+        push r8
+        push r9
 
         call eval
 
+        push r9
+        push r8
         pop rcx
         pop rdx
+
         push rdx
         push rcx
 
 
-
-
         pop rcx
         pop rdx
-        pop rsi
 
 
         push r10
