@@ -9,8 +9,15 @@ SECTION .data
     genericErrorMsg: db `There was some error.\n`
 	genericErrorMsgLen equ $-genericErrorMsg
 
-    testSymbol: db "abc"
-    db 0
+    testSymbol: db "abc",0
+
+    testSymbol2: db "wew",0
+    testSymbol3: db "lads",0
+
+    nullSymbol: db "null",0
+
+
+    ifSymbol: db "if",0
 
 
 SECTION .bss
@@ -110,9 +117,22 @@ _start:
 
     mov rdx, symbol_t
     mov rcx, testSymbol
-
     mov r8, int_t
     mov r9, 42
+
+    call addToEnvironment
+
+    mov rdx, symbol_t
+    mov rcx, testSymbol2
+    mov r8, symbol_t
+    mov r9, testSymbol3
+
+    call addToEnvironment
+
+    mov rdx, symbol_t
+    mov rcx, nullSymbol
+    mov r8, null_t
+    mov r9, 0
 
     call addToEnvironment
 
@@ -331,6 +351,135 @@ eval:
         ret ; Integers are "self-quoting"
 
     .cons:
+        push r12
+        push r13
+        push r14
+        push r15
+
+        mov r12, [rsi] ; (car exp) type
+        mov r13, [rsi+8] ; (car exp)
+        mov r14, [rsi+16] ; (cdr exp) type
+        mov r15, [rsi+24] ; (cdr exp)
+
+        cmp r12, symbol_t
+        jne .notBasicForm
+
+    ; Check if "if"
+    .maybeIf:
+        mov rdi, ifSymbol
+        mov rsi, r13
+
+        push rdx
+        push rcx
+
+        call cmpNullTerminatedStrings
+
+        pop rcx
+        pop rdx
+
+        cmp rax, 0
+        jne .notBasicForm
+
+
+        ; If cdr isn't a list, it's worthless
+        cmp r14, cons_t
+        jne exitError
+
+        mov rsi, r15
+        mov r12, [rsi] ; (car (cdr exp)) type (the condition)
+        mov r13, [rsi+8] ; (car (cdr exp)) 
+        mov r14, [rsi+16] ; (cdr (cdr exp)) type
+        mov r15, [rsi+24] ; (cdr (cdr exp))
+
+        mov rdi, r12
+        mov rsi, r13
+
+        push rdx
+        push rcx
+
+        call eval
+
+        pop rcx
+        pop rdx
+
+
+        ; In my dialect, for simplicity null is the same as false
+        cmp rdi, null_t
+        je .isFalse
+    .isTrue:
+
+        ; we need to get and evaluate the caddr
+
+        cmp r14, cons_t
+        jne exitError
+
+        mov rsi, r15
+        mov r12, [rsi] ; caddr type
+        mov r13, [rsi+8] ; caddr
+
+        mov rdi, r12
+        mov rsi, r13
+
+        push rdx
+        push rcx
+
+        call eval
+
+        pop rcx
+        pop rdx
+
+
+        jmp .endCons
+    .isFalse:
+
+        ; we need to get and evaluate the cadddr
+        cmp r14, cons_t
+        jne exitError
+
+        mov rsi, r15
+        mov r12, [rsi+16] ; cdddr type
+        mov r13, [rsi+24] ; cdddr
+
+
+
+        cmp r12, cons_t
+        jne exitError
+
+        mov rsi, r13
+        mov r12, [rsi] ; cadddr type
+        mov r13, [rsi+8] ; cadddr
+
+        mov rdi, r12
+        mov rsi, r13
+
+        push rdx
+        push rcx
+
+        call eval
+
+        pop rcx
+        pop rdx
+
+        jmp .endCons
+
+
+
+    .notBasicForm:
+
+        jmp exitError
+
+
+
+        jmp .endCons
+    .endCons:
+        
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+
+        jmp .return
+
         jmp exitError ; NOT IMPLEMENTED
 
     .symbol:
@@ -347,8 +496,15 @@ eval:
 
         pop rcx
         pop rdx
+        jmp .return
+
+
+    .return: 
 
         ret
+
+
+
 
 
 
