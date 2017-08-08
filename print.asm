@@ -4,6 +4,8 @@ SECTION .bss
     numPrintBuffLen equ 80
 	numPrintBuff: resb (numPrintBuffLen +1)
 
+    charPrintBuff: resb 1
+
 SECTION .text
 
 print:
@@ -27,13 +29,13 @@ print:
 
         mov rdi, 1 ; print to stdout
 
-        mov al, '('
+        mov sil, '('
         call printChar
 
 
 
 
-        mov al, ' '
+        mov sil, ' '
         call printChar
 
         pop rax
@@ -79,9 +81,19 @@ print:
 printNullTerminatedString:
     ; string comes into rsi
         
-        push rax
+		push rax
+		push rbx
+		push rcx
+		push rdx
         push rdi
-        push rdx
+        push rsi
+
+        push r8
+        push r9
+        push r10
+        push r11
+        
+
 
         push rsi
 
@@ -104,9 +116,17 @@ printNullTerminatedString:
         ; rdx is the size of the string
         syscall
 
-        pop rdx
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+
+        pop rsi
         pop rdi
-        pop rax
+		pop rdx
+		pop rcx
+		pop rbx
+		pop rax
         ret
 
 
@@ -126,8 +146,7 @@ printRestOfList:
         jne .notNull
 
         mov rdi, 1 ; print to stdout
-
-        mov al, ')'
+        mov rsi, ')'
         call printChar
 
         jmp .return
@@ -147,7 +166,7 @@ printRestOfList:
         call print
 
         mov rdi, 1 ; print char to stdout
-        mov al, ' '
+        mov rsi, ' '
         call printChar
 
         pop rbx
@@ -167,23 +186,23 @@ printRestOfList:
         push rax
 
 
-        mov rdi, 1 ; print to stdout
-
-        mov al, '.'
+        mov rdi, 1
+        mov rsi, '.'
         call printChar
-        mov al, ' '
+        mov rdi, 1
+        mov rsi, ' '
         call printChar
 
 
         pop rax
 
         call print
-
     
-        mov rdi, 1 ; print to stdout
-        mov al, ' '
+        mov rdi, 1
+        mov rsi, ' '
         call printChar
-        mov al, ')'
+        mov rdi, 1
+        mov rsi, ')'
         call printChar
 
         jmp .return
@@ -196,24 +215,42 @@ printRestOfList:
 
 
 printChar:
-    ; character to print comes into al
     ; file to print to comes into rdi
+    ; character to print comes into lower byte of rsi
 
+    push rax
+    push rbx
+    push rcx
+    push rdx
     push rdi
     push rsi
-    push rdx
 
-    mov byte [rsp+8], al
+    push r8
+    push r9
+    push r10
+    push r11
+
+
+    mov byte [charPrintBuff], sil
 
     mov rax, 1
     ; rdi is already right
-    lea rsi, [rsp+8]
+    mov rsi, charPrintBuff
     mov rdx, 1
     syscall
 
-    pop rdx
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+
     pop rsi
     pop rdi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+
 
     ret
 
@@ -227,6 +264,11 @@ printNumber:
 		push rdx
         push rdi
         push rsi
+
+        push r8
+        push r9
+        push r10
+        push r11
 
 
         push rax
@@ -288,6 +330,10 @@ printNumber:
         syscall
 
 
+        pop r11
+        pop r10
+        pop r9
+        pop r8
 
         pop rsi
         pop rdi
@@ -298,4 +344,36 @@ printNumber:
 	
 ret
 
+
+printNewline:
+		push rax
+		push rbx
+		push rcx
+		push rdx
+        push rdi
+        push rsi
+
+        push r8
+        push r9
+        push r10
+        push r11
+
+    mov rdi, 1 ; print char to stdout
+    mov rsi, 0
+    mov sil, `\n`
+    call printChar
+
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+
+        pop rsi
+        pop rdi
+		pop rdx
+		pop rcx
+		pop rbx
+		pop rax
+	
+    ret
 

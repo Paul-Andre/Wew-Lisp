@@ -96,7 +96,6 @@ findEndOfSymbol:
 
         
 
-
 parseNum:
     ; string pointer comes into rsi
 
