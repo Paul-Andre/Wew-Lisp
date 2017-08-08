@@ -343,13 +343,13 @@ addListToEnv:
         jmp .loop
         
 
-    .notCons
+    .notCons:
         cmp r12, null_t
         je .isNull
 
         jmp exitError; (We don't handle weird . thing yet)
 
-    .isNull
+    .isNull:
         ; Verify that the length of the values is the same
         cmp r14, null_t
         jne exitError
@@ -932,7 +932,7 @@ handleBuiltInApplication:
         pop rax
 
 
-        push r11
+        push r11 ; These pushes are special. They are used to pass the arguments
         push r10
 
         mov r8, r14
@@ -954,6 +954,7 @@ handleBuiltInApplication:
 
         lea r12, [r12*2]
         lea rsp, [rsp + r12*8] ; subtract rsi*16 from the stack
+        ; This is equivalent to popping r12*2 times
         
     .return:
     
@@ -963,6 +964,7 @@ handleBuiltInApplication:
         pop r12
 
         ret
+
 
 
 handleSchemeApplication:
@@ -970,96 +972,79 @@ handleSchemeApplication:
     ; rdx:rcx is the environment of course
     ; r8:r9 is the argument list
     ; 
-    ;
-    ;
     ; rdi:rsi value out
     ; Let's assume that there is no environment out
     ;
+    ; What I'm going to do is that I'm going to evaluate builtInList on the
+    ; argument list and then put it into the environment and eval the AST
 
-    push r12
-    push r13
-    push r14
-    push r15
+    push rsi
 
-    push rbx
+    push rdx
+    push rcx
 
-    mov rbx, rsi ; save the function
+    mov rdi, bi_fun_t
+    mov rsi, builtInList
 
-    ; We eval the arguments and place them on the stack;
-    ; We then pop them back and construct a list;
-    ; We then pass that list to addToEnvironment which will treat
-    ; correctly both cases of (lambda x ...) and (lambda (a b c) ...)
-    ;
-    ; I should perhaps treat both cases separately to avoid creating useless list
+    call handleBuiltInApplication
 
-    ; This will be used to iterate through the arguments
-    mov r12, r8
-    mov r13, r9
+    pop rcx
+    pop rdx
+
+    ; Now rdi:rsi contains the list we want to insert into env
+    mov r8, rdi
+    mov r9, rsi
     
-    .argEvalLoop:
-        cmp r8, null_t
-        je .break
-        
-        cmp r8, cons_t
-        jne exitError
+    pop rsi
 
-        mov rdi, [r9]
-        mov rsi, [r9+8]
-        mov r8, [r9+16]
-        mov r9, [r9+24]
-
-        push rdx
-        push rcx
-        push r8
-        push r9
-
-        call eval
-
-        push r9
-        push r8
-        pop rcx
-        pop rdx
-
-        push rdx
-        push rcx
+    mov rax, rsi
 
 
-        pop rcx
-        pop rdx
+    mov rdi, [rax]    ; the "car" of the lambda is the environment
+    mov rsi, [rax + 8]
+
+    mov r10, [rax + 16]  ; the "cdr" of the lambda is the argument list and the body AST
+    mov r11, [rax + 24]
+
+    ; Better check this at creation time...
+    cmp r10, cons_t
+    jne exitError
+
+    mov rdx, [r11]  ; the car of the cdr is tha argument list
+    mov rcx, [r11 + 8]
 
 
-        push r10
-        push r11
 
-        mov r8, r14
-        mov r9, r15
 
-        inc rax
-        jmp .argEvalLoop
+    push r11
 
-    .break:
+    call addToEnvironment
 
-        ; Now it's the time to evaluate that function
-        mov r12, rax ; We need to save the number of arguments somewhere not on the stack
-        mov rdi, rax
+    pop r11
 
-        call rsi
-        
-        ; Now the answer should be in rdi:rsi
-        ; Time to clean the stack
+    ; Now the new environment is in rdi:rsi. Move it to rdx:rcx
+    mov rdx, rdi
+    mov rcx, rsi
 
-        lea r12, [r12*2]
-        lea rsp, [rsp + r12*8] ; subtract rsi*16 from the stack
-        
-    .return:
-    
-        pop rbx
-        pop r15
-        pop r14
-        pop r13
-        pop r12
+    mov rdi, [r11 + 16]   ;the "cdr" "cdr" of the lambda is the body.
+    mov rsi, [r11 + 24]   ;the "cdr" "cdr" of the lambda is the body.
+    ; For now, we only consider a single expression, even though we should
+    ; consider that there is an implicit "begin"
 
-        ret
+    ; There should be something in the lambda body
+    ; (Though we probably want to check this at lambda creation time)
+    cmp rdi, cons_t
+    jne exitError
+
+
+    mov rdi, [rsi]     ; The first expression of the body
+    mov rsi, [rsi + 8]
+
+
+    jmp eval; tail-call
+
+
+
 
 
 
