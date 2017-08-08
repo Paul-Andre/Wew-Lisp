@@ -241,35 +241,121 @@ addToEnvironment:
     ; Eventually I'd like to be able to work with a list of symbols for some
     ; kind of pattern matching, but for now it must be a symbol
 
-    cmp rdx, symbol_t
-    jne exitError
+        cmp rdx, symbol_t
+        je .standardAdd
 
-    ; create the (symbol, value) pair
-    mov r10, [alloc_ptr]
+        cmp rdx, cons_t
+        je .listAdd
+        cmp rdx, null_t
+        je .listAdd
+        jmp  exitError
 
-    mov [r10], rdx
-    mov [r10 + 8], rcx
-    mov [r10 + 16], r8
-    mov [r10 + 24], r9
 
-    add qword [alloc_ptr], 32
+    .listAdd:
+        call addListToEnv
 
-    ; create the ((symbol, value), previousEnvironment) pair
-    mov r11, [alloc_ptr]
+        jmp .return
 
-    mov qword [r11], cons_t
-    mov [r11 + 8], r10
-    mov [r11 + 16], rdi
-    mov [r11 + 24], rsi
+    .standardAdd:
 
-    add qword [alloc_ptr], 32
+        ; create the (symbol, value) pair
+        mov r10, [alloc_ptr]
 
-    ;return it
-    mov rdi, cons_t
-    mov rsi, r11
+        mov [r10], rdx
+        mov [r10 + 8], rcx
+        mov [r10 + 16], r8
+        mov [r10 + 24], r9
 
-    ret
+        add qword [alloc_ptr], 32
 
+        ; create the ((symbol, value), previousEnvironment) pair
+        mov r11, [alloc_ptr]
+
+        mov qword [r11], cons_t
+        mov [r11 + 8], r10
+        mov [r11 + 16], rdi
+        mov [r11 + 24], rsi
+
+        add qword [alloc_ptr], 32
+
+        ;return it
+        mov rdi, cons_t
+        mov rsi, r11
+
+        jmp .return
+
+    .return:
+
+        ret
+
+
+
+addListToEnv:
+    ; The pointer to the environment list (a cons cell) is in rdi:rsi
+    ; The symbols we insert with are in rdx:rcx (should be a list)
+    ; The values we insert are in r8:r9 (should be a list)
+    ;
+        
+
+        push r12
+        push r13
+        push r14
+        push r15
+
+        mov r12, rdx
+        mov r13, rcx
+        mov r14, r8
+        mov r15, r9
+
+    .loop:
+        
+        cmp r12, cons_t
+        jne .notCons
+
+        cmp r14, cons_t
+        jne exitError
+
+        mov rdx, [r13] ;car of symbols
+        mov rcx, [r13+8]
+        mov r12, [r13+16] ; cdr of symbols
+        mov r13, [r13+24]
+
+        mov r8, [r15] ;car of values
+        mov r9, [r15+8]
+        mov r14, [r15+16] ; cdr of values
+        mov r15, [r15+24]
+
+        ; At this point, rdx:rcx contains a symbol and r8:r9 contains a value
+        ; rdi:rsi contains previous environment
+
+        call addToEnvironment
+
+        ; At this point, rdi:rsi contains new environment
+
+        jmp .loop
+        
+
+    .notCons
+        cmp r12, null_t
+        je .isNull
+
+        jmp exitError; (We don't handle weird . thing yet)
+
+    .isNull
+        ; Verify that the length of the values is the same
+        cmp r14, null_t
+        jne exitError
+
+        jmp .return
+
+    .return:
+
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+
+        ret
 
 
 
@@ -479,17 +565,27 @@ eval:
         pop rdx
         
         cmp rdi, bi_fun_t ; built-in function
-        jne exitError
-
-
-
+        jne .maybeSchemeFunction
 
         mov r8, [r10 + 16] ; get the cdr
         mov r9, [r10 + 24]
 
-        call handleBuiltIn
+        call handleBuiltInApplication
 
         jmp .endCons
+
+    .maybeSchemeFunction: ; Maybe a lambda?
+        cmp rdi, sc_fun_t 
+        jne exitError
+
+        mov r8, [r10 + 16] ; get the cdr
+        mov r9, [r10 + 24]
+
+        call handleSchemeApplication
+
+        jmp .endCons
+        
+        
     .endCons:
         
         jmp .return
@@ -681,7 +777,7 @@ builtInCons:
 
 
 
-handleBuiltIn:
+handleBuiltInApplication:
     ; rdi:rsi is the function. rdi doesn't really matter tho since we know it's bi_fun_t
     ; rdx:rcx is the environment of course
     ; r8:r9 is the argument list
@@ -758,6 +854,102 @@ handleBuiltIn:
         
     .return:
     
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+
+        ret
+
+
+handleSchemeApplication:
+    ; rdi:rsi is the function. we know it's a bi_fun_t
+    ; rdx:rcx is the environment of course
+    ; r8:r9 is the argument list
+    ;
+    ; rdi:rsi value out
+    ; Let's assume that there is no environment out
+    ;
+
+    push r12
+    push r13
+    push r14
+    push r15
+    push rbx
+
+    mov rbx, rsi
+
+    ;  Get the function AST
+    mov r14, [rsi+16]
+    mov r15, [rsi+24]
+
+
+    ; 
+
+    ;  Get the first
+
+    
+    .argEvalLoop:
+        cmp r8, null_t
+        je .break
+        
+        cmp r8, cons_t
+        jne exitError
+
+        mov r12, [r9]
+        mov r13, [r9+8]
+        mov r8, [r9+16]
+        mov r9, [r9+24]
+
+        push rsi
+        push rdi
+        push rdx
+        push rcx
+
+        mov rdi, r12
+        mov rsi, r13
+
+        call eval
+
+        pop rcx
+        pop rdx
+        push rdx
+        push rcx
+
+
+
+
+        pop rcx
+        pop rdx
+        pop rsi
+
+
+        push r10
+        push r11
+
+        mov r8, r14
+        mov r9, r15
+
+        inc rax
+        jmp .argEvalLoop
+
+    .break:
+
+        ; Now it's the time to evaluate that function
+        mov r12, rax ; We need to save the number of arguments somewhere not on the stack
+        mov rdi, rax
+
+        call rsi
+        
+        ; Now the answer should be in rdi:rsi
+        ; Time to clean the stack
+
+        lea r12, [r12*2]
+        lea rsp, [rsp + r12*8] ; subtract rsi*16 from the stack
+        
+    .return:
+    
+        pop rbx
         pop r15
         pop r14
         pop r13
