@@ -17,7 +17,24 @@ SECTION .data
     nullSymbol: db "null",0
 
 
+    ; Special forms:
+
     ifSymbol: db "if",0
+    quoteSymbol: db "quote",0
+    lambdaSymbol: db "lambda",0
+
+    beginSymbol: db "begin",0
+    defineSymbol: db "define",0
+    letSymbol: db "let",0
+    setSymbol: db "set!",0
+
+    ; Built-in functions:
+
+    plusSymbol: db "+",0
+    minusSymbol: db "-",0
+    multiplicationSymbol: db "*",0
+    divisionSymbol: db "/",0
+
 
 
 SECTION .bss
@@ -170,10 +187,20 @@ cmpNullTerminatedStrings:
     ; returns 0 in rax if strings are equal, something else if they are not
     ; (idea is that eventually we might also say whether one of them is bigger than the other)
 
+    push rsi
+    call printNullTerminatedString
+    call printNewline
+
+    mov rsi, rdi
+
+    call printNullTerminatedString
+    call printNewline
+    pop rsi
+
     .loop:
         mov r8b, [rdi]
-        mov r9b, [rsi]
-        cmp r8b, r9b
+        mov al, [rsi]
+        cmp r8b, al
         je .same
         jmp .negative
 
@@ -361,30 +388,41 @@ eval:
         jne .notBasicForm
 
     ; Check if "if"
-    .maybeIf:
-        mov rdi, ifSymbol
-        mov rsi, r9
 
-        push rdx
-        push rcx
-        push r10
-        push r11
+    .maybeIf:
+        mov rsi, r9
+        mov rdi, ifSymbol
 
         call cmpNullTerminatedStrings
 
-        pop r11
-        pop r10
-        pop rcx
-        pop rdx
-
         cmp rax, 0
-        jne .notBasicForm
+        jne .maybeQuote
 
         mov rdi, r10
         mov rsi, r11
 
-        jmp handleIf; tail call
+        call handleIf;
 
+        jmp .endCons
+
+
+    .maybeQuote:
+        mov rsi, r9
+        mov rdi, quoteSymbol
+
+        call cmpNullTerminatedStrings
+        cmp rax, 0
+        jne .notBasicForm
+
+        cmp r10, cons_t ; if not a cons, is not correct
+        jne exitError
+
+
+        ; If it's a quote, we just return the car of the cdr as is
+        mov rdi, [r11]
+        mov rsi, [r11 + 8]
+
+        jmp .endCons
 
 
 
