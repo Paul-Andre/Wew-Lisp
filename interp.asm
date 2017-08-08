@@ -651,6 +651,7 @@ handleBuiltIn:
         mov r14, [r9+16]
         mov r15, [r9+24]
 
+        push rax
         push rdx
         push rcx
         push rsi
@@ -667,6 +668,8 @@ handleBuiltIn:
         pop rsi
         pop rcx
         pop rdx
+        pop rax
+
 
         push r10
         push r11
