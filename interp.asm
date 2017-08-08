@@ -381,11 +381,10 @@ eval:
 
         mov r8, [rsi] ; (car exp) type
         mov r9, [rsi+8] ; (car exp)
-        mov r10, [rsi+16] ; (cdr exp) type
-        mov r11, [rsi+24] ; (cdr exp)
+        mov r10, rsi
 
         cmp r8, symbol_t
-        jne .notBasicForm
+        jne .notSpecialForm
 
     ; Check if "if"
 
@@ -398,8 +397,8 @@ eval:
         cmp rax, 0
         jne .maybeQuote
 
-        mov rdi, r10
-        mov rsi, r11
+        mov rdi, [r10 + 16]
+        mov rsi, [r10 + 24]
 
         call handleIf;
 
@@ -412,11 +411,14 @@ eval:
 
         call cmpNullTerminatedStrings
         cmp rax, 0
-        jne .notBasicForm
+        jne .notSpecialForm
 
-        cmp r10, cons_t ; if not a cons, is not correct
+
+        mov r11, [r10 + 24] ; get the cdr
+        mov r10, [r10 + 16]
+
+        cmp r10, cons_t ; if cdr not a cons, is not correct
         jne exitError
-
 
         ; If it's a quote, we just return the car of the cdr as is
         mov rdi, [r11]
@@ -426,11 +428,26 @@ eval:
 
 
 
-    .notBasicForm:
+    .notSpecialForm:
 
-        jmp exitError
+        mov rdi, [r10] ; Get the car
+        mov rsi, [r10 + 8]
 
+        push rdx
+        push rcx
 
+        call eval
+
+        pop rcx
+        pop rdx
+        
+        cmp rdi, bi_fun_t ; built-in function
+        jne exitError
+
+        mov r8, [r10 + 16] ; get the cdr
+        mov r9, [r10 + 24]
+
+        call handleBuiltIn
 
         jmp .endCons
     .endCons:
@@ -555,6 +572,86 @@ handleIf:
 
     .return:
 
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+
+        ret
+
+
+handleBuiltIn:
+    ; rdi:rsi is the function. rdi doesn't really matter tho since we know it's bi_fun_t
+    ; rdx:rcx is the environment of course
+    ; r8:r9 is the argument list
+    ;
+    ; rdi:rsi value out
+    ; Let's assume that there is no environment out
+    ;
+    ; As I evaluate the arguments, I put them onto the stack.
+    ; Then I put the number of arguments into rdi and call the function
+    ; Value should be returned to rdi:rsi
+    ; Functions should follow system-v clobbered/preserved convention
+
+    push r12
+    push r13
+    push r14
+    push r15
+
+    mov rax, 0
+    
+    .argEvalLoop:
+        cmp r8, null_t
+        je .break
+        
+        cmp r8, cons_t
+        jne exitError
+
+        mov r12, [r9]
+        mov r13, [r9+8]
+        mov r14, [r9+16]
+        mov r15, [r9+24]
+
+        push rdx
+        push rcx
+        push rsi
+
+        mov rdi, r12
+        mov rsi, r13
+
+        call eval
+
+        mov r10, rdi
+        mov r11, rsi
+
+        pop rsi
+        pop rcx
+        pop rdx
+
+        push r10
+        push r11
+
+        mov r8, r14
+        mov r9, r15
+
+        inc rax
+        jmp .argEvalLoop
+
+    .break:
+
+        ; Now it's the time to evaluate that function
+        mov r12, rax ; We need to save the number of arguments somewhere not on the stack
+
+        call rsi
+        
+        ; Now the answer should be in rdi:rsi
+        ; Time to clean the stack
+
+        lea r12, [r12*2]
+        lea rsp, [rsp + r12*8] ; subtract rsi*16 from the stack
+        
+    .return:
+    
         pop r15
         pop r14
         pop r13
