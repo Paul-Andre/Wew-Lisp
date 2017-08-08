@@ -31,6 +31,7 @@ SECTION .data
     ; Built-in functions:
 
     plusSymbol: db "+",0
+    consSymbol: db "cons",0
     minusSymbol: db "-",0
     multiplicationSymbol: db "*",0
     divisionSymbol: db "/",0
@@ -157,6 +158,13 @@ _start:
     mov rcx, plusSymbol
     mov r8, bi_fun_t
     mov r9, builtInAdd
+
+    call addToEnvironment
+
+    mov rdx, symbol_t
+    mov rcx, consSymbol
+    mov r8, bi_fun_t
+    mov r9, builtInCons
 
     call addToEnvironment
 
@@ -585,7 +593,6 @@ handleIf:
 
 
 builtInAdd:
-    
 
         mov rax, 0
 
@@ -616,6 +623,32 @@ builtInAdd:
         ret
 
     
+builtInCons:
+
+        cmp rdi, 2
+        jne exitError
+
+        mov r8, [rsp + 32]
+        mov r9, [rsp + 24]
+        mov r10, [rsp + 16]
+        mov r11, [rsp + 8]
+
+        mov rdi, [alloc_ptr]
+
+        ; TODO: use vectorization
+
+        mov [rdi], r8
+        mov [rdi+8], r9
+        mov [rdi+16], r10
+        mov [rdi+24], r11
+        
+        add qword [alloc_ptr], 32
+
+        mov rsi, rdi
+        mov rdi, cons_t
+        
+        ret
+
 
 
 
