@@ -4,12 +4,10 @@
 %include "parse.asm"
 %include "print.asm"
 %include "builtIns.asm"
+%include "utils.asm"
 
 
 SECTION .data
-    genericErrorMsg: db `There was some error.\n`
-	genericErrorMsgLen equ $-genericErrorMsg
-
 
 
     ; Special forms:
@@ -856,7 +854,6 @@ handleSchemeApplication:
 
 
 
-
     push r11
 
     call addToEnvironment
@@ -875,7 +872,7 @@ handleSchemeApplication:
     ; There should be something in the lambda body
     ; (Though we probably want to check this at lambda creation time)
     cmp rdi, cons_t
-    jne exitError
+    errorNe "Lambda must have body"
 
 
     mov rdi, [rsi]     ; The first expression of the body
@@ -891,19 +888,4 @@ handleSchemeApplication:
 
 
 
-exitError:
-
-    ; First print a generic error message:
-        mov rax, 1
-        mov rdi, 2 ; stderr
-        mov rsi, genericErrorMsg
-        mov rdx, genericErrorMsgLen
-        syscall
-
-
-    ; rdi specifies return code
-        mov rax, 60
-        mov rdi, 1
-        syscall
-    
     
