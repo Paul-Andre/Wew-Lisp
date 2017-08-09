@@ -146,5 +146,8 @@ createInitialEnvironment:
     insertFunctionIntoEnvironment builtInCons, "cons"
     insertFunctionIntoEnvironment builtInList, "list"
 
+
+    call addDefineNodeToEnvironment
+
     ret
 

@@ -179,6 +179,57 @@ cmpNullTerminatedStrings:
         ret
 
 
+addDefineNodeToEnvironment:
+    ; environment comes in to and out of rdi:rsi
+
+    mov rax, [alloc_ptr]
+
+    mov qword [rax], null_t
+    mov qword [rax+8], 0
+    mov [rax+16], rdi
+    mov [rax+24], rsi
+
+    mov rdi, cons_t
+    mov rsi, [alloc_ptr]
+    add qword [alloc_ptr], 32
+
+    ret
+    
+
+
+
+addToEnvironmentWithDefine:
+    ; If the car of the list is a null, it is used as a "ref-cell" and we can
+    ; change the cdr to the augmented environment.
+    ;
+    ; The pointer to the environment list (a cons cell) is in rdi:rsi
+    ; The symbol we insert with is in rdx:rcx
+    ; The value we insert is in r8:r9
+    ;
+    cmp rdi, cons_t
+    errorNe "Environment given to addToEnvironmentWithDefine isn't a cons"
+
+    cmp qword [rsi], null_t
+    errorNe "Are you trying to define inside an expression?"
+
+    push rsi
+
+    mov rdi, [rsi+16]
+    mov rsi, [rsi+24]
+
+    call addToEnvironment
+
+    push rax
+    mov [rax+16], rdi
+    mov [rax+24], rsi
+
+    mov rdi, cons_t
+    mov rsi, rax
+
+    ret
+
+
+
 addToEnvironment:
     ; The pointer to the environment list (a cons cell) is in rdi:rsi
     ; The symbol we insert with is in rdx:rcx
@@ -337,8 +388,11 @@ findInEnvironment:
         mov r11, [rsi+24] ;cdr
 
         ; Just a sanity check
+        cmp r8, null_t
+        je .tryNext
+
         cmp r8, cons_t
-        jne exitError
+        errorNe "Something that's not a pair is in the environment list."
 
 
         mov r12, [r9] ; (car (car x)) type
@@ -367,6 +421,8 @@ findInEnvironment:
 
         cmp rax, 0
         je .success 
+        
+    .tryNext:
         mov rdi, r10
         mov rsi, r11
 
@@ -666,44 +722,6 @@ handleIf:
 
 
 
-
-
-
-%macro pushEverything 0
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-%endmacro
-    
-%macro popEverything 0
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-
-%endmacro
 
 
 printWrapper:
