@@ -1,10 +1,10 @@
 ; Wew lads
 
+%include "utils.asm"
 %include "types.asm"
 %include "parse.asm"
 %include "print.asm"
 %include "builtIns.asm"
-%include "utils.asm"
 
 
 SECTION .data

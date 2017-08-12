@@ -25,6 +25,12 @@ parse:
 
         call parseRestOfList
 
+        cmp byte [rsi], ')'
+        errorNe "Unclosed parenthesis"
+
+        mov byte [rsi], 0
+        inc rsi
+
         ret
 
     .checkIfNum:
@@ -184,7 +190,7 @@ parseRestOfList:
         je .returnNull
 
         cmp al, 0
-        je .noClosingParen
+        je .returnNull
 
         call parse
         
@@ -219,8 +225,6 @@ parseRestOfList:
         jmp .return
 
     .returnNull:
-        mov byte [rsi], 0
-        inc rsi
 
         mov rax, null_t
         mov rbx, 0
