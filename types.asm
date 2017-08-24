@@ -6,7 +6,7 @@
 %define int_t 1
 
 ; Points to a heap allocated cons cell
-%define cons_t 2
+%define pair_t 2
 
 ; A symbol is a null-terminated string
 %define symbol_t 3

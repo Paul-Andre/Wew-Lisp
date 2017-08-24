@@ -217,7 +217,7 @@ parseRestOfList:
         mov [rdi+24], rbx
 
 
-        mov rax, cons_t
+        mov rax, pair_t
         mov rbx, rdi
 
         add qword [alloc_ptr], 32

@@ -88,7 +88,7 @@ _start:
         mov byte [rax], 0
         inc rax
 
-    ; Align the pointer to 32 bytes (size of a cons)
+    ; Align the pointer to 32 bytes (size of a pair)
     align_loop:
         mov rdi, rax
         and rdi, 0x1f
@@ -180,6 +180,8 @@ cmpNullTerminatedStrings:
 
 
 addDefineNodeToEnvironment:
+    ; Basically this creates a new environment "frame" or something like that
+    ; eh, maybe make this better defined and actually take the time to do this while I'm not tired, eh? Why don't you go to sleep, it's almost midnightttttttttt
     ; environment comes in to and out of rdi:rsi
 
     mov rax, [alloc_ptr]
@@ -189,7 +191,7 @@ addDefineNodeToEnvironment:
     mov [rax+16], rdi
     mov [rax+24], rsi
 
-    mov rdi, cons_t
+    mov rdi, pair_t
     mov rsi, [alloc_ptr]
     add qword [alloc_ptr], 32
 
@@ -206,8 +208,8 @@ addToEnvironmentWithDefine:
     ; The symbol we insert with is in rdx:rcx
     ; The value we insert is in r8:r9
     ;
-    cmp rdi, cons_t
-    errorNe "Environment given to addToEnvironmentWithDefine isn't a cons"
+    cmp rdi, pair_t
+    errorNe "Environment given to addToEnvironmentWithDefine isn't a pair"
 
     cmp qword [rsi], null_t
     errorNe "Are you trying to define inside an expression?"
@@ -223,7 +225,7 @@ addToEnvironmentWithDefine:
     mov [rax+16], rdi
     mov [rax+24], rsi
 
-    mov rdi, cons_t
+    mov rdi, pair_t
     mov rsi, rax
 
     ret
@@ -244,7 +246,7 @@ addToEnvironment:
         cmp rdx, symbol_t
         je .standardAdd
 
-        cmp rdx, cons_t
+        cmp rdx, pair_t
         je .listAdd
         cmp rdx, null_t
         je .listAdd
@@ -271,7 +273,7 @@ addToEnvironment:
         ; create the ((symbol, value), previousEnvironment) pair
         mov r11, [alloc_ptr]
 
-        mov qword [r11], cons_t
+        mov qword [r11], pair_t
         mov [r11 + 8], r10
         mov [r11 + 16], rdi
         mov [r11 + 24], rsi
@@ -279,7 +281,7 @@ addToEnvironment:
         add qword [alloc_ptr], 32
 
         ;return it
-        mov rdi, cons_t
+        mov rdi, pair_t
         mov rsi, r11
 
         jmp .return
@@ -309,10 +311,10 @@ addListToEnv:
 
     .loop:
         
-        cmp r12, cons_t
+        cmp r12, pair_t
         jne .notCons
 
-        cmp r14, cons_t
+        cmp r14, pair_t
         jne exitError
 
         mov rdx, [r13] ;car of symbols
@@ -378,7 +380,7 @@ findInEnvironment:
         ; Check if the input is a cons.
         ; It might be a null if the variable isn't in the environment
         ; TODO make a clearer error message about this
-        cmp rdi, cons_t
+        cmp rdi, pair_t
         jne exitError
 
 
@@ -391,7 +393,7 @@ findInEnvironment:
         cmp r8, null_t
         je .tryNext
 
-        cmp r8, cons_t
+        cmp r8, pair_t
         errorNe "Something that's not a pair is in the environment list."
 
 
@@ -464,8 +466,8 @@ eval:
         je exitError
         cmp rdi, int_t
         je .int
-        cmp rdi, cons_t
-        je .cons
+        cmp rdi, pair_t
+        je .pair
         cmp rdi, symbol_t
         je .symbol
 
@@ -474,7 +476,7 @@ eval:
     .int:
         ret ; Integers are "self-quoting"
 
-    .cons:
+    .pair:
 
         mov r8, [rsi] ; (car exp) type
         mov r9, [rsi+8] ; (car exp)
@@ -499,7 +501,7 @@ eval:
 
         call handleIf;
 
-        jmp .endCons
+        jmp .endPair
 
 
     .maybeQuote:
@@ -514,14 +516,14 @@ eval:
         mov r11, [r10 + 24] ; get the cdr
         mov r10, [r10 + 16]
 
-        cmp r10, cons_t ; if cdr not a cons, is not correct
+        cmp r10, pair_t ; if cdr not a cons, is not correct
         jne exitError
 
         ; If it's a quote, we just return the car of the cdr as is
         mov rdi, [r11]
         mov rsi, [r11 + 8]
 
-        jmp .endCons
+        jmp .endPair
 
 
     .maybeLambda:
@@ -535,7 +537,7 @@ eval:
         mov r11, [r10 + 24] ; get the cdr
         mov r10, [r10 + 16]
 
-        cmp r10, cons_t ; if cdr not a cons, is not correct
+        cmp r10, pair_t ; if cdr not a pair, is not correct
         jne exitError
 
         ; A lambda is a pair of its environment and its ast (excluding the "lambda" bit)
@@ -551,7 +553,7 @@ eval:
 
         mov rdi, sc_fun_t
 
-        jmp .endCons
+        jmp .endPair
 
 
     .notSpecialForm:
@@ -577,7 +579,7 @@ eval:
 
         call handleBuiltInApplication
 
-        jmp .endCons
+        jmp .endPair
 
     .maybeSchemeFunction: ; Maybe a lambda?
         cmp rdi, sc_fun_t 
@@ -588,10 +590,10 @@ eval:
 
         call handleSchemeApplication
 
-        jmp .endCons
+        jmp .endPair
         
         
-    .endCons:
+    .endPair:
         
         jmp .return
 
@@ -632,7 +634,7 @@ handleIf:
         push r15
 
         ; If cdr isn't a list, it's worthless
-        cmp rdi, cons_t
+        cmp rdi, pair_t
         jne exitError
 
         mov r12, [rsi] ; (car (cdr exp)) type (the condition)
@@ -659,7 +661,7 @@ handleIf:
 
         ; we need to get and evaluate the caddr
 
-        cmp r14, cons_t
+        cmp r14, pair_t
         jne exitError
 
         mov rsi, r15
@@ -682,7 +684,7 @@ handleIf:
     .isFalse:
 
         ; we need to get and evaluate the cadddr
-        cmp r14, cons_t
+        cmp r14, pair_t
         jne exitError
 
         mov rsi, r15
@@ -691,7 +693,7 @@ handleIf:
 
 
 
-        cmp r12, cons_t
+        cmp r12, pair_t
         jne exitError
 
         mov rsi, r13
@@ -761,7 +763,7 @@ handleBuiltInApplication:
         cmp r8, null_t
         je .break
         
-        cmp r8, cons_t
+        cmp r8, pair_t
         jne exitError
 
         mov r12, [r9]
@@ -864,7 +866,7 @@ handleSchemeApplication:
     mov r11, [rax + 24]
 
     ; Better check this at creation time...
-    cmp r10, cons_t
+    cmp r10, pair_t
     jne exitError
 
     mov rdx, [r11]  ; the car of the cdr is tha argument list
@@ -889,7 +891,7 @@ handleSchemeApplication:
 
     ; There should be something in the lambda body
     ; (Though we probably want to check this at lambda creation time)
-    cmp rdi, cons_t
+    cmp rdi, pair_t
     errorNe "Lambda must have body"
 
 
@@ -899,6 +901,31 @@ handleSchemeApplication:
 
     jmp eval; tail-call
 
+
+
+
+evalSequence:
+    ; Evaluates a sequences, which might contain defines
+    ; Sequences are explicitly defined with `begin` or implicitly defined in the body of lambdas
+    ;
+    ; rdi:rsi is the list of instructions
+    ; rdx:rcx is the environment
+    ;
+
+    ; First start by making a new "frame" in the environment
+        push rsi
+        push rdi
+
+        call addDefineNodeToEnvironment
+        ; At this point, rdi:rsi contains a new "frame" where we can define new 
+
+        pop rdi
+        pop rsi
+
+
+    ; What's a bit special about evalSequence is that it returns the last 
+
+    .loop:
 
 
 

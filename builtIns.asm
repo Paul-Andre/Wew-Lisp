@@ -60,7 +60,7 @@ builtInCons:
         add qword [alloc_ptr], 32
 
         mov rsi, rdi
-        mov rdi, cons_t
+        mov rdi, pair_t
         
         ret
 
@@ -97,7 +97,7 @@ builtInList:
         mov [rax + 16], rdi
         mov [rax + 24], rsi
 
-        mov rdi, cons_t
+        mov rdi, pair_t
         mov rsi, [alloc_ptr]
         
         add qword [alloc_ptr], 32
