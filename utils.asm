@@ -2,6 +2,8 @@
 SECTION .data
     genericErrorMsg: db `\nERROR!\n`
 	genericErrorMsgLen equ $-genericErrorMsg
+    genericExitErrorMsg: db `\nTHERE WAS SOME ERROR!\n`
+	genericExitErrorMsgLen equ $-genericExitErrorMsg
 
 
 
@@ -54,7 +56,18 @@ printAndExit:
         mov rdi, 2 ; stderr
         syscall
 
-        jmp exitError
+    ; First print a generic error message:
+        mov rax, 1
+        mov rdi, 2 ; stderr
+        mov rsi, genericErrorMsg
+        mov rdx, genericErrorMsgLen
+        syscall
+
+
+    ; rdi specifies return code
+        mov rax, 60
+        mov rdi, 1
+        syscall
 
 
 exitError:
@@ -62,8 +75,8 @@ exitError:
     ; First print a generic error message:
         mov rax, 1
         mov rdi, 2 ; stderr
-        mov rsi, genericErrorMsg
-        mov rdx, genericErrorMsgLen
+        mov rsi, genericExitErrorMsg
+        mov rdx, genericExitErrorMsgLen
         syscall
 
 

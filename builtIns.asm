@@ -21,7 +21,7 @@ builtInAdd:
         mov rsi, [rsp + rdi - 8]
 
         cmp rsi, int_t
-        jne exitError
+        errorNe "Argument to '+' isn't an integer"
 
         add rax, [rsp + rdi]
 
@@ -53,7 +53,7 @@ builtInSub:
         mov rsi, [rsp + 16]
 
         cmp rdi, int_t
-        errorNe "Argument to '-' isn't an integer"
+        jne .typeError
 
         neg rsi
 
@@ -72,7 +72,7 @@ builtInSub:
         sub rdi, 8
 
         cmp rdx, int_t
-        errorNe "Argument to '-' isn't an integer"
+        jne .typeError
 
         mov rax, rcx
 
@@ -83,7 +83,7 @@ builtInSub:
         mov rsi, [rsp + rdi - 8]
 
         cmp rsi, int_t
-        errorNe "Argument to '-' isn't an integer"
+        jne .typeError
 
         sub rax, [rsp + rdi]
 
@@ -91,6 +91,9 @@ builtInSub:
         sub rdi, 8
 
         jmp .loop
+
+    .typeError:
+        errorMsg "Argument to '-' isn't an integer"
 
     .return:
 
@@ -131,6 +134,142 @@ builtInMul:
         mov rsi, rax
 
         ret
+
+builtInIntEq:
+
+        cmp rdi, 0
+        je .argumentNumberError
+        cmp rdi, 1
+        je .argumentNumberError
+
+
+    .takeFirst:
+
+        lea rdi, [rdi*2]
+        lea rdi, [rdi*8]
+        
+        mov rdx, [rsp + rdi - 8]
+        mov rcx, [rsp + rdi]
+
+        sub rdi, 8
+        sub rdi, 8
+
+        cmp rdx, int_t
+        jne .typeError
+
+        mov rax, rcx
+
+    .loop:
+        cmp rdi, 0
+        je .returnEqual
+
+        mov rsi, [rsp + rdi - 8]
+
+        cmp rsi, int_t
+        jne .typeError
+
+        cmp rax, [rsp + rdi]
+        jne .returnNotEqual
+
+        sub rdi, 8
+        sub rdi, 8
+
+        jmp .loop
+
+    .typeError:
+        errorMsg "Argument to '=' isn't an integer"
+
+    .argumentNumberError:
+        errorMsg "'=' must be called with at least two argument"
+
+    .returnEqual:
+
+        mov rdi, bool_t
+        mov rsi, 1
+
+        ret
+
+    .returnNotEqual:
+
+        mov rdi, bool_t
+        mov rsi, 0
+
+        ret
+
+
+%macro comparisonFunction 3
+
+%1: 
+
+        cmp rdi, 0
+        je .argumentNumberError
+        cmp rdi, 1
+        je .argumentNumberError
+
+
+    .takeFirst:
+
+        lea rdi, [rdi*2]
+        lea rdi, [rdi*8]
+        
+        mov rdx, [rsp + rdi - 8]
+        mov rcx, [rsp + rdi]
+
+        sub rdi, 8
+        sub rdi, 8
+
+        cmp rdx, int_t
+        jne .typeError
+
+        mov rax, rcx
+
+    .loop:
+        cmp rdi, 0
+        je .returnEqual
+
+        mov rsi, [rsp + rdi - 8]
+
+        cmp rsi, int_t
+        jne .typeError
+
+        cmp rax, [rsp + rdi]
+        %3 .returnNotEqual
+        mov rax, [rsp + rdi]
+
+        sub rdi, 8
+        sub rdi, 8
+
+        jmp .loop
+
+    .typeError:
+        errorMsg "Argument to comparison function isn't an integer"
+
+    .argumentNumberError:
+        errorMsg "Comparison functions must be called with at least two argument"
+
+    .returnEqual:
+
+        mov rdi, bool_t
+        mov rsi, 1
+
+        ret
+
+    .returnNotEqual:
+
+        mov rdi, bool_t
+        mov rsi, 0
+
+        ret
+
+%endmacro
+
+
+comparisonFunction builtInIntLt, "<", jge
+comparisonFunction builtInIntGt, ">", jle
+comparisonFunction builtInIntLeq, "<=", jg
+comparisonFunction builtInIntGeq, ">=", jl
+
+
 
     
 builtInCons:
@@ -265,6 +404,11 @@ createInitialEnvironment:
     insertFunctionIntoEnvironment builtInAdd, "+"
     insertFunctionIntoEnvironment builtInSub, "-"
     insertFunctionIntoEnvironment builtInMul, "*"
+    insertFunctionIntoEnvironment builtInIntEq, "="
+    insertFunctionIntoEnvironment builtInIntLt, "<"
+    insertFunctionIntoEnvironment builtInIntGt, ">"
+    insertFunctionIntoEnvironment builtInIntLeq, "<="
+    insertFunctionIntoEnvironment builtInIntGeq, ">="
     insertFunctionIntoEnvironment builtInNot, "not"
     insertFunctionIntoEnvironment builtInCons, "cons"
     insertFunctionIntoEnvironment builtInList, "list"
