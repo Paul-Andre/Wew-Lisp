@@ -577,16 +577,27 @@ eval:
 
         call cmpNullTerminatedStrings
         cmp rax, 0
-        jne .notSpecialForm
+        jne .maybeDefine
 
         mov rdi, [r10 + 16]
         mov rsi, [r10 + 24]
 
         jmp evalSequence ; tail call
 
+    .maybeDefine:
+        mov rsi, r9
+        mov rdi, defineSymbol
 
-    .notSpecialForm:
+        call cmpNullTerminatedStrings
+        cmp rax, 0
+        jne .notSpecialForm
 
+        mov rdi, [r10 + 16]
+        mov rsi, [r10 + 24]
+
+        jmp handleDefine ; tail call
+
+    .notSpecialForm: 
         mov rdi, [r10] ; Get the car
         mov rsi, [r10 + 8]
 
@@ -931,6 +942,58 @@ handleSchemeApplication:
 
     jmp evalSequence; tail-call
 
+
+handleDefine: 
+    ;
+    ; rdi:rsi
+    ; rdx:rcx is the environment
+
+    cmp edi, pair_t
+
+    errorNe "'define' must be followed by two data."
+
+    mov r8, [rsi]
+    mov r9, [rsi+8]
+    mov r10, [rsi+16]
+    mov r11, [rsi+24]
+    
+    push r9
+    push r8
+
+    cmp r10d, pair_t
+    errorNe "'define' must be followed by two data."
+
+    mov r8, [r11]
+    mov r9, [r11+8]
+    mov r10, [r11+16]
+    mov r11, [r11+24]
+
+    cmp r10d, null_t
+    errorNe "'define' must be followed by two data."
+
+    mov rdi, r8
+    mov rsi, r9
+
+    push rcx
+    push rdx
+
+    call eval
+
+    mov r8, rdi ; put the value in r8:r9
+    mov r9, rsi
+
+    pop rdi ; Put the environment in rdi:rsi
+    pop rsi
+
+    pop rdx ; Put the key in rdx:rcx
+    pop rcx
+
+    call addToEnvironmentWithDefine
+
+    mov rdi, unspecified_t
+    mov rsi, unspecified_value
+
+    ret
 
 
 

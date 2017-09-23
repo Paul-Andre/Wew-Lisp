@@ -20,6 +20,10 @@
 ; Null array
 %define null_t 0
 
+; What to return from things that shouldn't return anything
+%define unspecified_t 0
+%define unspecified_value 0
+
 ; Boolean
 %define bool_t 1
 
