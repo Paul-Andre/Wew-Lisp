@@ -106,8 +106,14 @@ _start:
 
 ; parse the code
     mov rsi, [heap_start]
-    call parse
+    call parseRestOfList
+    push rax
+    mov al, [rsi]
+    cmp al, ')'
+    errorE "unopened ')' at the end"
+
     mov byte [rsi], 0 ; A hack so that a single symbol can correctly be read
+    pop rax
 
 
 ; play around with environment
@@ -128,7 +134,7 @@ _start:
     mov rsi, rbx
 
 
-    call eval
+    call evalSequence
 
 
 
@@ -201,8 +207,11 @@ addDefineNodeToEnvironment:
 
 
 addToEnvironmentWithDefine:
-    ; If the car of the list is a null, it is used as a "ref-cell" and we can
-    ; change the cdr to the augmented environment.
+    ; When defining things with "define", to make sure that the definitions are mutually recursive,
+    ; we pass an environment containing an indirection. 
+    ; 
+    ; For now, that indirection is a pair whose car is a null.
+    ; addDefineNodeToEnvironment is used to get the redirection.
     ;
     ; The pointer to the environment list (a cons cell) is in rdi:rsi
     ; The symbol we insert with is in rdx:rcx
@@ -215,13 +224,16 @@ addToEnvironmentWithDefine:
     errorNe "Are you trying to define inside an expression?"
 
     push rsi
+    push rdi
 
     mov rdi, [rsi+16]
     mov rsi, [rsi+24]
 
     call addToEnvironment
 
-    push rax
+    pop rax
+    pop rax
+
     mov [rax+16], rdi
     mov [rax+24], rsi
 
@@ -239,9 +251,6 @@ addToEnvironment:
     ;
     ; The new environment is returned in rdi:rsi
     ;
-
-    ; Eventually I'd like to be able to work with a list of symbols for some
-    ; kind of pattern matching, but for now it must be a symbol
 
         cmp rdx, symbol_t
         je .standardAdd
@@ -539,7 +548,7 @@ eval:
 
         call cmpNullTerminatedStrings
         cmp rax, 0
-        jne .notSpecialForm
+        jne .maybeBegin
 
         mov r11, [r10 + 24] ; get the cdr
         mov r10, [r10 + 16]
@@ -561,6 +570,19 @@ eval:
         mov rdi, sc_fun_t
 
         jmp .endPair
+
+    .maybeBegin:
+        mov rsi, r9
+        mov rdi, beginSymbol
+
+        call cmpNullTerminatedStrings
+        cmp rax, 0
+        jne .notSpecialForm
+
+        mov rdi, [r10 + 16]
+        mov rsi, [r10 + 24]
+
+        jmp evalSequence ; tail call
 
 
     .notSpecialForm:
@@ -888,7 +910,10 @@ handleSchemeApplication:
 
     call addToEnvironment
 
+    call addDefineNodeToEnvironment
+
     pop r11
+    
 
     ; Now the new environment is in rdi:rsi. Move it to rdx:rcx
     mov rdx, rdi
@@ -904,12 +929,7 @@ handleSchemeApplication:
     cmp rdi, pair_t
     errorNe "Lambda must have body"
 
-
-    mov rdi, [rsi]     ; The first expression of the body
-    mov rsi, [rsi + 8]
-
-
-    jmp eval; tail-call
+    jmp evalSequence; tail-call
 
 
 
@@ -922,25 +942,48 @@ evalSequence:
     ; rdx:rcx is the environment
     ;
 
-    ; First start by making a new "frame" in the environment
-        push rsi
-        push rdi
-
-        call addDefineNodeToEnvironment
-        ; At this point, rdi:rsi contains a new "frame" where we can define new 
-
-        pop rdi
-        pop rsi
 
 
-    ; What's a bit special about evalSequence is that it returns the last 
+    ; What's a bit special about evalSequence is that it returns the result of the last operation.
 
     .loop:
 
+        cmp edi, pair_t
+        errorNe "What was passed to evalSequence isn't a list"
+
+        mov r8, [rsi]
+        mov r9, [rsi+8]
+        mov r10, [rsi+16]
+        mov r11, [rsi+24]
+
+        cmp r10, null_t
+        je .tailCall
+
+
+        push r11
+        push r10
+        push rcx
+        push rdx
+
+        mov rdi, r8
+        mov rsi, r9
+
+        call eval
+
+        pop rdx
+        pop rcx
+        pop rdi
+        pop rsi 
+
+
+        jmp .loop
 
 
 
+    .tailCall:
+        mov rdi, r8
+        mov rsi, r9
 
+        jmp eval
 
-
-    
+        

@@ -89,7 +89,7 @@ builtInSub:
 
         sub rdi, 8
         sub rdi, 8
-/cons
+
         jmp .loop
 
     .typeError:
@@ -279,7 +279,7 @@ get2Arguments:
         je .correct
         ret
     
-    .correct
+    .correct:
         mov rdi, [rsp + 24]
         mov rsi, [rsp + 32]
         mov rdx, [rsp + 8]
@@ -294,7 +294,7 @@ get2Arguments:
 builtInCons:
 
         cmp rdi, 2
-        errorNe "'cons' requires two arguments
+        errorNe "'cons' requires two arguments"
 
         mov r8, [rsp + 24]
         mov r9, [rsp + 32]
