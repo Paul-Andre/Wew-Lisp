@@ -59,11 +59,36 @@ builtInCons:
         
         add qword [alloc_ptr], 32
 
-        mov rsi, rdi
         mov rdi, pair_t
+        mov rsi, rdi
         
         ret
 
+builtInNot:
+
+        cmp rdi, 1
+        errorNe "'not' must have exactly one argument"
+
+        mov rdi, [rsp + 8]
+        mov rsi, [rsp + 16]
+
+        cmp rdi, bool_t
+        jne .returnFalse
+        cmp rsi, 0
+        jne .returnFalse
+
+    .returnTrue:
+        mov rdi, bool_t
+        mov rsi, 1
+        
+        ret
+
+    .returnFalse:
+
+        mov rdi, bool_t
+        mov rsi, 0
+        
+        ret
 
 
 builtInList:
@@ -143,6 +168,7 @@ createInitialEnvironment:
     call addToEnvironment
 
     insertFunctionIntoEnvironment builtInAdd, "+"
+    insertFunctionIntoEnvironment builtInNot, "not"
     insertFunctionIntoEnvironment builtInCons, "cons"
     insertFunctionIntoEnvironment builtInList, "list"
 
