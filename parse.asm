@@ -59,6 +59,8 @@ parse:
         cmp al, 't'
         jne .maybeFalse
 
+        call findEndOfSymbol ; #titititi counts as true...
+
         mov rax, bool_t
         mov rbx, 1
 
@@ -68,10 +70,11 @@ parse:
         cmp al, 'f'
         errorNe "'#' must be followed by 't' or 'f'"
 
+        call findEndOfSymbol ; #titititi counts as true...
+
         mov rax, bool_t
         mov rbx, 0
 
-        call findEndOfSymbol ; #titititi counts as true...
         ret
 
     .checkIfQuote:

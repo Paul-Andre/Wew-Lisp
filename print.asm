@@ -46,11 +46,40 @@ print:
 
     .maybeNumber:
         cmp rax, int_t
-        jne .maybeSymbol
+        jne .maybeBool
 
         mov rax, rbx
 
         call printNumber
+
+        jmp .return
+
+    .maybeBool:
+        cmp rax, bool_t
+        jne .maybeSymbol
+
+        mov rdi, 1
+        mov sil, "#"
+
+        call printChar
+
+        cmp rbx, 0
+        jne .true
+
+
+        mov rdi, 1
+        mov sil, "f"
+
+        call printChar
+
+        jmp .return
+
+
+    .true:
+        mov rdi, 1
+        mov sil, "t"
+
+        call printChar
 
         jmp .return
         
@@ -69,7 +98,7 @@ print:
         jmp .return
 
     .error:
-        errorMsq "The object cannot be printed"
+        errorMsg "The object cannot be printed"
 
 
     .return:

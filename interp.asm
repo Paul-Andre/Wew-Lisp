@@ -464,17 +464,24 @@ eval:
 
         cmp rdi, null_t
         je exitError
+
         cmp rdi, int_t
-        je .int
+        je .selfQuoting
+        cmp rdi, bool_t
+        je .selfQuoting
+        cmp rdi, char_t
+        je .selfQuoting
+
         cmp rdi, pair_t
         je .pair
         cmp rdi, symbol_t
         je .symbol
 
-        jmp exitError ; We shouldn't find anything else in the AST
+        ; We shouldn't find anything else in the AST
+        errorMsg "Trying to evaluate something that isn't valid AST"
 
-    .int:
-        ret ; Integers are "self-quoting"
+    .selfQuoting:
+        ret ;
 
     .pair:
 
@@ -657,8 +664,7 @@ handleIf:
         cmp edi, bool_t
         jne .isTrue
         cmp rsi, 0
-        jne .isTrue
-        jmp .isFalse
+        je .isFalse
     .isTrue:
 
         ; we need to get and evaluate the caddr
@@ -675,6 +681,7 @@ handleIf:
 
         push rdx
         push rcx
+
 
         call eval
 
@@ -707,6 +714,7 @@ handleIf:
 
         push rdx
         push rcx
+
 
         call eval
 
