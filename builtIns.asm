@@ -37,6 +37,101 @@ builtInAdd:
 
         ret
 
+
+builtInSub:
+
+        cmp rdi, 0
+        errorE "'-' must be called with at least one argument"
+
+        cmp rdi, 1
+        jne .actuallySub
+
+
+    .negate:
+
+        mov rdi, [rsp + 8]
+        mov rsi, [rsp + 16]
+
+        cmp rdi, int_t
+        errorNe "Argument to '-' isn't an integer"
+
+        neg rsi
+
+        ret
+
+
+    .actuallySub:
+
+        lea rdi, [rdi*2]
+        lea rdi, [rdi*8]
+        
+        mov rdx, [rsp + rdi - 8]
+        mov rcx, [rsp + rdi]
+
+        sub rdi, 8
+        sub rdi, 8
+
+        cmp rdx, int_t
+        errorNe "Argument to '-' isn't an integer"
+
+        mov rax, rcx
+
+    .loop:
+        cmp rdi, 0
+        je .return
+
+        mov rsi, [rsp + rdi - 8]
+
+        cmp rsi, int_t
+        errorNe "Argument to '-' isn't an integer"
+
+        sub rax, [rsp + rdi]
+
+        sub rdi, 8
+        sub rdi, 8
+
+        jmp .loop
+
+    .return:
+
+        mov rdi, int_t
+        mov rsi, rax
+
+        ret
+
+
+
+builtInMul:
+
+        mov rax, 1
+
+        lea rdi, [rdi*2]
+        lea rdi, [rdi*8]
+
+    .loop:
+        cmp rdi, 0
+        je .return
+
+        mov rsi, [rsp + rdi - 8]
+
+        cmp rsi, int_t
+        jne exitError
+
+        mov rcx, [rsp + rdi]
+        imul rcx
+
+        sub rdi, 8
+        sub rdi, 8
+
+        jmp .loop
+
+    .return:
+
+        mov rdi, int_t
+        mov rsi, rax
+
+        ret
+
     
 builtInCons:
 
@@ -168,6 +263,8 @@ createInitialEnvironment:
     call addToEnvironment
 
     insertFunctionIntoEnvironment builtInAdd, "+"
+    insertFunctionIntoEnvironment builtInSub, "-"
+    insertFunctionIntoEnvironment builtInMul, "*"
     insertFunctionIntoEnvironment builtInNot, "not"
     insertFunctionIntoEnvironment builtInCons, "cons"
     insertFunctionIntoEnvironment builtInList, "list"
