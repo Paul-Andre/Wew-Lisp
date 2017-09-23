@@ -36,10 +36,10 @@ parse:
     .checkIfNum:
         
         cmp al, '0'
-        jb .mustBeSymbol
+        jb .checkIfSpecial
 
         cmp al, '9'
-        ja .mustBeSymbol
+        ja .checkIfSpecial
 
         call parseNum
 
@@ -47,6 +47,69 @@ parse:
         mov rax, int_t
 
         ret
+
+    .checkIfSpecial:
+        cmp al, '#'
+        jne .checkIfQuote
+
+        inc rsi
+
+        mov al, [rsi]
+
+        cmp al, 't'
+        jne .maybeFalse
+
+        mov rax, bool_t
+        mov rbx, 1
+
+        ret
+
+    .maybeFalse:
+        cmp al, 'f'
+        errorNe "'#' must be followed by 't' or 'f'"
+
+        mov rax, bool_t
+        mov rbx, 0
+
+        call findEndOfSymbol ; #titititi counts as true...
+        ret
+
+    .checkIfQuote:
+        cmp al, "'"
+        jne .mustBeSymbol
+
+        inc rsi
+
+        call parse
+
+        ; write the values to heap
+        mov rdi, [alloc_ptr]
+
+        mov qword [rdi], rax
+        mov qword [rdi+8], rbx
+        mov qword [rdi+16], null_t
+        mov qword [rdi+24], 0
+
+        mov rax, pair_t
+        mov rbx, [alloc_ptr]
+
+        add qword [alloc_ptr], 32
+
+
+        mov rdi, [alloc_ptr]
+
+        mov qword [rdi], symbol_t
+        mov qword [rdi+8], quoteSymbol
+        mov [rdi+16], rax
+        mov [rdi+24], rbx
+
+        mov rax, pair_t
+        mov rbx, [alloc_ptr]
+
+        add qword [alloc_ptr], 32
+
+        ret
+
 
     .mustBeSymbol:
 
@@ -61,10 +124,7 @@ parse:
         ret
 
     .error:
-        call exitError
-
-
-
+        errorMsg "Error parsing"
     
 
 

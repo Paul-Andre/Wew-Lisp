@@ -69,7 +69,7 @@ print:
         jmp .return
 
     .error:
-        call exitError
+        errorMsq "The object cannot be printed"
 
 
     .return:

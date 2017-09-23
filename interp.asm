@@ -654,9 +654,11 @@ handleIf:
         pop rdx
 
 
-        ; In my dialect, for simplicity null is the same as false
-        cmp rdi, null_t
-        je .isFalse
+        cmp edi, bool_t
+        jne .isTrue
+        cmp rsi, 0
+        jne .isTrue
+        jmp .isFalse
     .isTrue:
 
         ; we need to get and evaluate the caddr
