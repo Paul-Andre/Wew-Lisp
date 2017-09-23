@@ -89,7 +89,7 @@ builtInSub:
 
         sub rdi, 8
         sub rdi, 8
-
+/cons
         jmp .loop
 
     .typeError:
@@ -264,6 +264,7 @@ builtInIntEq:
 %endmacro
 
 
+; Bloating the binary, generate a bunch of comparison functions
 comparisonFunction builtInIntLt, "<", jge
 comparisonFunction builtInIntGt, ">", jle
 comparisonFunction builtInIntLeq, "<=", jg
@@ -271,11 +272,29 @@ comparisonFunction builtInIntGeq, ">=", jl
 
 
 
+; This sub-procedure is to get 2 arguments passed to a built-in proc
+; The zf will be preserved so a jne or je could be used after
+get2Arguments:
+        cmp rdi, 2
+        je .correct
+        ret
+    
+    .correct
+        mov rdi, [rsp + 24]
+        mov rsi, [rsp + 32]
+        mov rdx, [rsp + 8]
+        mov rcx, [rsp + 16]
+
+        ret
+        
+    
+
+
     
 builtInCons:
 
         cmp rdi, 2
-        jne exitError
+        errorNe "'cons' requires two arguments
 
         mov r8, [rsp + 24]
         mov r9, [rsp + 32]
@@ -297,6 +316,7 @@ builtInCons:
         mov rsi, rdi
         
         ret
+
 
 builtInNot:
 
@@ -368,6 +388,23 @@ builtInList:
         ; At this point, rdi:rsi contains the answer
         
         ret
+
+;builtInApply:
+;
+;        call get2Arguments
+;        errorNe "'apply' requires 2 arguments"
+;
+;        cmp rdi, bi_fun_t
+;        je .applyBuiltIn
+;        cmp rdi, sc_fun_t
+;        je .applyScheme
+;        errorMsg "First argument to 'apply' must be a function"
+;
+;    .applyBuiltIn:
+;
+;
+;    .applyScheme:
+
 
 
 %macro insertFunctionIntoEnvironment 2

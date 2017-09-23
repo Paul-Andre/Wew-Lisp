@@ -837,7 +837,7 @@ handleBuiltInApplication:
 
 
 handleSchemeApplication:
-    ; rdi:rsi is the function. we know it's a bi_fun_t
+    ; rdi:rsi is the function. we know it's a sc_fun_t
     ; rdx:rcx is the environment of course
     ; r8:r9 is the argument list
     ; 
@@ -894,8 +894,8 @@ handleSchemeApplication:
     mov rdx, rdi
     mov rcx, rsi
 
-    mov rdi, [r11 + 16]   ;the "cdr" "cdr" of the lambda is the body.
-    mov rsi, [r11 + 24]   ;the "cdr" "cdr" of the lambda is the body.
+    mov rdi, [r11 + 16]   ;the "cddr" of the lambda is the body.
+    mov rsi, [r11 + 24]   ;the "cddr" of the lambda is the body.
     ; For now, we only consider a single expression, even though we should
     ; consider that there is an implicit "begin"
 
