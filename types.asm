@@ -1,19 +1,43 @@
+; Each Scheme object will be represented by a 128 bit value. The first word
+; contains type information and the second word contains data or a pointer to
+; data.
 
-; Null array, also works as false
+; The higher 32 bits represent information used by the memory manager.
+
+; The highest 4 bits are used to identify what "kind" of heap allocated data it is and the rest represents its size.
+
+; On linux, user-space addresses must have a 0 in their higher bit.
+; By setting the highest bit of GC'ed types to 1, we make sure that no pointer
+; saved on the stack is ever going to be confused for an object type.
+
+; The highest bit is always 1 for the type of heap allocated objects.
+
+; The lower 32 bits is a number that should identify the actual object type
+
+
+%define small_vector_set (0b1001)
+
+; Null array
 %define null_t 0
 
-; 64-bit int. Also works as a pointer
-%define int_t 1
+; Boolean
+%define bool_t 1
+
+; 64-bit integer
+%define int_t 2
+
+; Unicode character
+%define char_t 4
 
 ; Points to a heap allocated cons cell
-%define pair_t 2
+%define pair_t 5
 
 ; A symbol is a null-terminated string
-%define symbol_t 3
+%define symbol_t 6
 
 ; Built-in function
-%define bi_fun_t 4
+%define bi_fun_t 7
 
 ; A function defined in scheme
-%define sc_fun_t 5
+%define sc_fun_t 8
 
