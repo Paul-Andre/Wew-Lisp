@@ -67,7 +67,7 @@
     ast)))
 
 
-(write (transform ( quote (define (a l) l) )))
+(transform ( quote (define (a l) l) ))
 
           
 

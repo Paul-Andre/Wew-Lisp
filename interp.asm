@@ -23,7 +23,6 @@ SECTION .data
 
 
 
-
 SECTION .bss
     heap_start: resq 1
     program_end: resq 1
@@ -234,6 +233,8 @@ addToEnvironmentWithDefine:
     pop rax
     pop rax
 
+    ; CAREFUL: here we write a pointer to a heap-allocated value!
+    ; With a generational collector, we would need to replace this.
     mov [rax+16], rdi
     mov [rax+24], rsi
 
@@ -369,7 +370,6 @@ addListToEnv:
         ret
 
 
-
 findInEnvironment:
     ; An environment is a list of pairs
     ; Bindings closer to the beginning shadow those closer to the end
@@ -377,13 +377,56 @@ findInEnvironment:
     ; The pointer to the environment list (a cons cell) is in rdi:rsi
     ; A pointer to the string we are searching for comes into rdx
 
-    ; The found value comes out of rdi:rsi
+    ; Value comes out of rdi:rsi
+        call findInEnvironmentPointer
+
+        mov rdi, [rax]
+        mov rsi, [rax + 8]
+
+        ret
+    
+    
+replaceInEnvironment:
+    ; Environment comes into rdi:rsi
+    ; Key comes into rdx:rcx
+    ; Value comes into r8:r9
+    ;
+    ; Nothing is returned
+
+
+        push r9
+        push r8
+
+        mov rdx, rcx ; Assuming for now rdx:rcx is a symbol
+
+        call findInEnvironmentPointer
+
+        pop r8
+        pop r9
+
+        ; CAREFUL: mutation here
+        mov [rax], r8
+        mov [rax + 8], r9
+
+        ret
+
+
+
+; Todo: the key should be in the form rdx:rcx
+findInEnvironmentPointer:
+    ; An environment is a list of pairs
+    ; Bindings closer to the beginning shadow those closer to the end
+
+    ; The pointer to the environment list (a cons cell) is in rdi:rsi
+    ; A pointer to the string we are searching for comes into rdx
+
+    ; A pointer to the returned value comes out of rax
     ;
 
-        push r12
-        push r13
-        push r14
         push r15
+        push r14
+        push r13
+        push r12
 
         
         ; Check if the input is a cons.
@@ -408,8 +451,7 @@ findInEnvironment:
 
         mov r12, [r9] ; (car (car x)) type
         mov r13, [r9+8] ; (car (car x))
-        mov r14, [r9+16] ; (cdr (car x)) type
-        mov r15, [r9+24] ; (cdr (car x))
+        lea r14, [r9+16] ; (cdr (car x)) type
 
 
         ; Again sanity check
@@ -421,14 +463,14 @@ findInEnvironment:
         mov rdi, r13
         mov rsi, rdx
 
-        push r10
         push r11
+        push r10
 
 
         call cmpNullTerminatedStrings
 
-        pop r11
         pop r10
+        pop r11
 
         cmp rax, 0
         je .success 
@@ -444,16 +486,15 @@ findInEnvironment:
 
     .success:
 
-        mov rdi, r14
-        mov rsi, r15
+        mov rax, r14
         jmp .return
 
     .return:
 
-        pop r15
-        pop r14
-        pop r13
         pop r12
+        pop r13
+        pop r14
+        pop r15
 
 
         ret
@@ -463,6 +504,8 @@ findInEnvironment:
 
 
 
+;TODO: a lot of the branches have the same structure. It would be nice to refactor it
+; Perhaps get the symbols interned?
 
 eval:
     ; The expression to be evaled goes into rdi:rsi
@@ -590,12 +633,25 @@ eval:
 
         call cmpNullTerminatedStrings
         cmp rax, 0
-        jne .notSpecialForm
+        jne .maybeSet
 
         mov rdi, [r10 + 16]
         mov rsi, [r10 + 24]
 
         jmp handleDefine ; tail call
+
+    .maybeSet:
+        mov rsi, r9
+        mov rdi, setSymbol
+
+        call cmpNullTerminatedStrings
+        cmp rax, 0
+        jne .notSpecialForm
+
+        mov rdi, [r10 + 16]
+        mov rsi, [r10 + 24]
+
+        jmp  handleSet; tail call
 
     .notSpecialForm: 
         mov rdi, [r10] ; Get the car
@@ -767,8 +823,7 @@ handleIf:
 
 
 
-
-
+; Used as a debugging tool to print stuff
 printWrapper:
     pushEverything
 
@@ -949,7 +1004,6 @@ handleDefine:
     ; rdx:rcx is the environment
 
     cmp edi, pair_t
-
     errorNe "'define' must be followed by two data."
 
     mov r8, [rsi]
@@ -994,6 +1048,59 @@ handleDefine:
     mov rsi, unspecified_value
 
     ret
+
+handleSet:
+    ;
+    ; rdi:rsi
+    ; rdx:rcx is the environment
+
+    cmp edi, pair_t
+    errorNe "'set' must be followed by two data."
+
+    mov r8, [rsi]
+    mov r9, [rsi+8]
+    mov r10, [rsi+16]
+    mov r11, [rsi+24]
+    
+    push r9
+    push r8
+
+    cmp r10d, pair_t
+    errorNe "'set' must be followed by two data."
+
+    mov r8, [r11]
+    mov r9, [r11+8]
+    mov r10, [r11+16]
+    mov r11, [r11+24]
+
+    cmp r10d, null_t
+    errorNe "'set' must be followed by two data."
+
+    mov rdi, r8
+    mov rsi, r9
+
+    push rcx
+    push rdx
+
+    call eval
+
+    mov r8, rdi ; put the value in r8:r9
+    mov r9, rsi
+
+    pop rdi ; Put the environment in rdi:rsi
+    pop rsi
+
+    pop rdx ; Put the key in rdx:rcx
+    pop rcx
+
+    call replaceInEnvironment
+
+    mov rdi, unspecified_t
+    mov rsi, unspecified_value
+
+    ret
+
+
 
 
 
