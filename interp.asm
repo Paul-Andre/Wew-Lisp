@@ -196,7 +196,7 @@ addDefineNodeToEnvironment:
     mov [rax+16], rdi
     mov [rax+24], rsi
 
-    mov rdi, pair_t
+    mov rdi, pair_t_full
     mov rsi, [alloc_ptr]
     add qword [alloc_ptr], 32
 
@@ -216,7 +216,7 @@ addToEnvironmentWithDefine:
     ; The symbol we insert with is in rdx:rcx
     ; The value we insert is in r8:r9
     ;
-    cmp rdi, pair_t
+    cmp edi, pair_t
     errorNe "Environment given to addToEnvironmentWithDefine isn't a pair"
 
     cmp qword [rsi], null_t
@@ -238,7 +238,7 @@ addToEnvironmentWithDefine:
     mov [rax+16], rdi
     mov [rax+24], rsi
 
-    mov rdi, pair_t
+    mov rdi, pair_t_full
     mov rsi, rax
 
     ret
@@ -256,7 +256,7 @@ addToEnvironment:
         cmp rdx, symbol_t
         je .standardAdd
 
-        cmp rdx, pair_t
+        cmp edx, pair_t
         je .listAdd
         cmp rdx, null_t
         je .listAdd
@@ -283,7 +283,8 @@ addToEnvironment:
         ; create the ((symbol, value), previousEnvironment) pair
         mov r11, [alloc_ptr]
 
-        mov qword [r11], pair_t
+        mov r9, pair_t_full
+        mov qword [r11], r9
         mov [r11 + 8], r10
         mov [r11 + 16], rdi
         mov [r11 + 24], rsi
@@ -321,10 +322,10 @@ addListToEnv:
 
     .loop:
         
-        cmp r12, pair_t
+        cmp r12d, pair_t
         jne .notCons
 
-        cmp r14, pair_t
+        cmp r14d, pair_t
         jne exitError
 
         mov rdx, [r13] ;car of symbols
@@ -432,8 +433,8 @@ findInEnvironmentPointer:
         ; Check if the input is a cons.
         ; It might be a null if the variable isn't in the environment
         ; TODO make a clearer error message about this
-        cmp rdi, pair_t
-        jne exitError
+        cmp edi, pair_t
+        errorNe "Looked up variable is not in environment"
 
 
         mov r8, [rsi]   ; car type
@@ -445,7 +446,7 @@ findInEnvironmentPointer:
         cmp r8, null_t
         je .tryNext
 
-        cmp r8, pair_t
+        cmp r8d, pair_t
         errorNe "Something that's not a pair is in the environment list."
 
 
@@ -524,7 +525,7 @@ eval:
         cmp rdi, char_t
         je .selfQuoting
 
-        cmp rdi, pair_t
+        cmp edi, pair_t
         je .pair
         cmp rdi, symbol_t
         je .symbol
@@ -575,7 +576,7 @@ eval:
         mov r11, [r10 + 24] ; get the cdr
         mov r10, [r10 + 16]
 
-        cmp r10, pair_t ; if cdr not a cons, is not correct
+        cmp r10d, pair_t ; if cdr not a cons, is not correct
         jne exitError
 
         ; If it's a quote, we just return the car of the cdr as is
@@ -596,7 +597,7 @@ eval:
         mov r11, [r10 + 24] ; get the cdr
         mov r10, [r10 + 16]
 
-        cmp r10, pair_t ; if cdr not a pair, is not correct
+        cmp r10d, pair_t ; if cdr not a pair, is not correct
         jne exitError
 
         ; A lambda is a pair of its environment and its ast (excluding the "lambda" bit)
@@ -610,7 +611,7 @@ eval:
         
         add qword [alloc_ptr], 32
 
-        mov rdi, sc_fun_t
+        mov rdi, sc_fun_t_full
 
         jmp .endPair
 
@@ -678,7 +679,7 @@ eval:
         jmp .endPair
 
     .maybeSchemeFunction: ; Maybe a lambda?
-        cmp rdi, sc_fun_t 
+        cmp edi, sc_fun_t 
         jne exitError
 
         mov r8, [r10 + 16] ; get the cdr
@@ -730,7 +731,7 @@ handleIf:
         push r15
 
         ; If cdr isn't a list, it's worthless
-        cmp rdi, pair_t
+        cmp edi, pair_t
         jne exitError
 
         mov r12, [rsi] ; (car (cdr exp)) type (the condition)
@@ -758,7 +759,7 @@ handleIf:
 
         ; we need to get and evaluate the caddr
 
-        cmp r14, pair_t
+        cmp r14d, pair_t
         jne exitError
 
         mov rsi, r15
@@ -782,7 +783,7 @@ handleIf:
     .isFalse:
 
         ; we need to get and evaluate the cadddr
-        cmp r14, pair_t
+        cmp r14d, pair_t
         jne exitError
 
         mov rsi, r15
@@ -791,7 +792,7 @@ handleIf:
 
 
 
-        cmp r12, pair_t
+        cmp r12d, pair_t
         jne exitError
 
         mov rsi, r13
@@ -861,7 +862,7 @@ handleBuiltInApplication:
         cmp r8, null_t
         je .break
         
-        cmp r8, pair_t
+        cmp r8d, pair_t
         jne exitError
 
         mov r12, [r9]
@@ -964,7 +965,7 @@ handleSchemeApplication:
     mov r11, [rax + 24]
 
     ; Better check this at creation time...
-    cmp r10, pair_t
+    cmp r10d, pair_t
     jne exitError
 
     mov rdx, [r11]  ; the car of the cdr is tha argument list
@@ -992,7 +993,7 @@ handleSchemeApplication:
 
     ; There should be something in the lambda body
     ; (Though we probably want to check this at lambda creation time)
-    cmp rdi, pair_t
+    cmp edi, pair_t
     errorNe "Lambda must have body"
 
     jmp evalSequence; tail-call
@@ -1117,6 +1118,7 @@ evalSequence:
     ; What's a bit special about evalSequence is that it returns the result of the last operation.
 
     .loop:
+
 
         cmp edi, pair_t
         errorNe "What was passed to evalSequence isn't a list"

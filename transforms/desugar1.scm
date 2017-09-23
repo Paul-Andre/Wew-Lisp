@@ -4,38 +4,45 @@
           (if (null? l) l
             (cons (f (car l)) (map-single f (cdr l))))))
 
-(define do-and (lambda (ast)
+(define desugar-and (lambda (ast)
           (if (null? ast)
             #t
             (if (null? (cdr ast))
               (car ast)
               (list 'if (transform (car ast))
-                    (do-and (cdr ast))
+                    (desugar-and (cdr ast))
                     #f)))))
 
-(define do-or (lambda (ast)
+(define desugar-or (lambda (ast)
           (if (null? ast)
             #f
             (if (null? (cdr ast))
               (car ast)
-              (let ((sym (gensym)))
+              ((lambda (sym) 
                 (list 'let (list(list sym (transform (car ast))))
-                      (list 'if sym sym (do-or (cdr ast)))))))))
+                      (list 'if sym sym (desugar-or (cdr ast))))) (gensym))))))
 
-(define do-cond (lambda (ast)
+(define desugar-let (lambda (ast)
+        (define variable-list (car ast))
+        (define body (transform (cdr ast)))
+        (define variable-names (map-single car variable-list))
+        (define variable-values (map-single transform
+                                            (map-single cadr
+                                                        variable-list)))
+        (cons (cons ( 'lambda (cons variable-names '())))
+              variable-values)))
+
+(define desugar-cond (lambda (ast)
           (if (null? ast)
             #f
             (if (eq? (caar ast) 'else)
               (cdar ast)
               (list 'if (transform (caar ast))
                     (cons 'begin (map-single transform (cdar ast)))
-                    (do-cond (cdr ast)))))))
-
-(define do-not (lambda (ast)
-              (list 'if ast #f #t)))
+                    (desugar-cond (cdr ast)))))))
 
 
-(define do-define (lambda (ast)
+(define desugar-define (lambda (ast)
                     (if (pair? (car ast))
                       (list 'define (caar ast)
                             (cons 'lambda
@@ -49,11 +56,10 @@
 
 (define transform-list
   (list
-    (cons 'and do-and)
-    (cons 'or do-or)
-    (cons 'cond do-cond)
-    (cons 'define do-define)
-    (cons 'not do-not)))
+    (cons 'and desugar-and)
+    (cons 'or desugar-or)
+    (cons 'cond desugar-cond)
+    (cons 'define desugar-define)))
 
 
 (define transform (lambda (ast)

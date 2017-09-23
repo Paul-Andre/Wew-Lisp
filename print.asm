@@ -19,7 +19,7 @@ print:
         cmp rax, null_t
         je .isList
 
-        cmp rax, pair_t
+        cmp eax, pair_t
         je .isList
 
         jmp .maybeNumber
@@ -181,7 +181,7 @@ printRestOfList:
         jmp .return
 
     .notNull:
-        cmp rax, pair_t
+        cmp eax, pair_t
         jne .somethingElse
 
         push rax

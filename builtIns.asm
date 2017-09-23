@@ -280,10 +280,11 @@ get2Arguments:
         ret
     
     .correct:
-        mov rdi, [rsp + 24]
-        mov rsi, [rsp + 32]
-        mov rdx, [rsp + 8]
-        mov rcx, [rsp + 16]
+        ; Note that we need to jump over the return address
+        mov rdi, [rsp + 32]
+        mov rsi, [rsp + 40]
+        mov rdx, [rsp + 16]
+        mov rcx, [rsp + 24]
 
         ret
         
@@ -312,8 +313,9 @@ builtInCons:
         
         add qword [alloc_ptr], 32
 
-        mov rdi, pair_t
         mov rsi, rdi
+        mov rdi, pair_t_full
+
         
         ret
 
@@ -376,7 +378,7 @@ builtInList:
         mov [rax + 16], rdi
         mov [rax + 24], rsi
 
-        mov rdi, pair_t
+        mov rdi, pair_t_full
         mov rsi, [alloc_ptr]
         
         add qword [alloc_ptr], 32
@@ -389,21 +391,49 @@ builtInList:
         
         ret
 
-;builtInApply:
-;
-;        call get2Arguments
-;        errorNe "'apply' requires 2 arguments"
-;
-;        cmp rdi, bi_fun_t
-;        je .applyBuiltIn
-;        cmp rdi, sc_fun_t
-;        je .applyScheme
-;        errorMsg "First argument to 'apply' must be a function"
-;
-;    .applyBuiltIn:
-;
-;
-;    .applyScheme:
+builtInGetType:
+        
+
+builtInVectorRef:
+
+        call get2Arguments
+        errorNe "'vector-ref' requires 2 arguments"
+
+        ;call printWrapper
+
+        mov r8, vector_mask
+        and r8, rdi
+
+        mov r9, vector_mask
+        cmp qword r8, r9
+        errorNe "Something that isn't essentially a vector was passed to 'vector-ref'"
+
+        cmp rdx, int_t
+        errorNe "Second argument of 'vector-ref' isn't an integer"
+
+        mov r8, rdi
+        shr r8, 32
+        and r8, size_mask
+
+        cmp rcx, 0
+        jl .notInRange
+
+        cmp r8, rcx
+        jle .notInRange
+
+        lea rcx, [rcx*2]
+
+        mov rdi, [rsi + rcx*8]
+        mov rsi, [rsi + rcx*8 + 8]
+
+
+        ret
+
+    .notInRange:
+        errorMsg "Integer passed to vector-ref is not in range"
+        
+        
+
 
 
 
@@ -447,6 +477,7 @@ createInitialEnvironment:
     insertFunctionIntoEnvironment builtInIntLeq, "<="
     insertFunctionIntoEnvironment builtInIntGeq, ">="
     insertFunctionIntoEnvironment builtInNot, "not"
+    insertFunctionIntoEnvironment builtInVectorRef, "vector-ref"
     insertFunctionIntoEnvironment builtInCons, "cons"
     insertFunctionIntoEnvironment builtInList, "list"
 

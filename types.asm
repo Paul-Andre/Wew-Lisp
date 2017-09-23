@@ -15,7 +15,10 @@
 ; The lower 32 bits is a number that should identify the actual object type
 
 
-%define small_vector_set (0b1001)
+%define vector_mask ((0b1001) << (64 - 4))
+%define buffer_mask ((0b1010) << (64 - 4))
+
+%define size_mask 0x0fffffff
 
 ; Null array
 %define null_t 0
@@ -35,6 +38,7 @@
 
 ; Points to a heap allocated cons cell
 %define pair_t 5
+%define pair_t_full (5 | (2 << 32) | vector_mask)
 
 ; A symbol is a null-terminated string
 %define symbol_t 6
@@ -44,4 +48,5 @@
 
 ; A function defined in scheme
 %define sc_fun_t 8
+%define sc_fun_t_full 8 | (2 << 32) | vector_mask
 

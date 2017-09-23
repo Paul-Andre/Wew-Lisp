@@ -93,7 +93,7 @@ parse:
         mov qword [rdi+16], null_t
         mov qword [rdi+24], 0
 
-        mov rax, pair_t
+        mov rax, pair_t_full
         mov rbx, [alloc_ptr]
 
         add qword [alloc_ptr], 32
@@ -106,7 +106,7 @@ parse:
         mov [rdi+16], rax
         mov [rdi+24], rbx
 
-        mov rax, pair_t
+        mov rax, pair_t_full
         mov rbx, [alloc_ptr]
 
         add qword [alloc_ptr], 32
@@ -280,7 +280,7 @@ parseRestOfList:
         mov [rdi+24], rbx
 
 
-        mov rax, pair_t
+        mov rax, pair_t_full
         mov rbx, rdi
 
         add qword [alloc_ptr], 32
